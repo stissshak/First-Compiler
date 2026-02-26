@@ -16,7 +16,7 @@ OBJ=$(patsubst $(SRC_DIR)/%.cpp, $(OBJ_DIR)/%.o, $(SRC))
 DEP=$(patsubst $(SRC_DIR)/%.cpp, $(DEP_DIR)/%.d, $(SRC))
 EXE=$(BIN_DIR)/comp
 
-all: debug run
+all: debug #run
 
 run: $(EXE)
 	@./$(EXE)
