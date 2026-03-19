@@ -5,16 +5,65 @@
 #include <string>
 #include <string_view>
 
-namespace tok{ 
-    enum TokenKind : unsigned short{ 
-    #define TOK(ID, TEXT) ID, 
-    #include "inc/TokenKind.hpp" 
-    }; 
-}
+enum class TokenKind{
+    Int,
+    Float,
+    Word,
+    String,
 
-struct Token{
-    std::string_view;       // Place of token and size from input
-    tok::TokenKind kind;    // Type of token
+    Plus,       // +
+    PlusPlus,   // ++
+    Minus,      // -
+    MinusMinus, // --
+    Star,       // *
+    Slash,      // /
+    Perc,       // %
+    PlusAssign, // +=
+    MinusAssign,// -=
+    SlashAssign,// /=
+    PercAssign, // %=
+    
+    Excl,       // !
+    Tilda,      // ~
+    LessLess,   // <<
+    GreatGreat, // >>
+    Amper,      // &
+    Pipe,       // |
+    Carret,     // ^
+    AmperAssign,// &=
+    PipeAssign, // |=
+
+    AmperAmper,     // &&
+    PipePipe,       // ||
+    Less,           // <
+    Great,          // >
+    LessAssign,     // <=
+    GreatAssign,    // >=
+    AssignAssign,   // ==
+    ExclAssign,     // !=
+
+    Assign,     // =
+    Comma,      // ,
+    Dot,        // .
+    Arrow,      // ->
+    Question,   // ?
+    Colon,      // :
+    Semicolon,  // ;
+    LPar,       // (
+    RPar,       // )
+    LBlock,     // {
+    RBlock,     // }
+    LBrace,     // [
+    RBrace,     // ]
+
+    Hash,       // #
+    Invalid,
+    Eof
+};
+
+struct Token{ 
+    TokenKind kind;         // Type of token
+    std::string_view data;  // Place of token and size from input
 };
 
 

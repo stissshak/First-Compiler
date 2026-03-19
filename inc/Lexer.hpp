@@ -2,18 +2,85 @@
 
 #pragma once
 
-#include <Token.hpp>
+#include "Token.hpp"
 
 #include <vector>
 #include <string>
+#include <unordered_map>
 
 class Lexer{
-private:
-    std::vector<Token> tokens;
-    std::size_t size;
 public:
-    void tokenize(const &std::string input);
-    const vector<Token> &get_tokens() const;
+    Lexer(std::string_view str) : raw(str), pos(0), len(str.length()){}
+    std::vector<Token> tokenize();
 private:
-    Token &extract(const &std::string input);
+    bool is_end() const;
+    bool start_num() const;
+    char peek() const;
+    char take();
+    Token extract();
+    Token extract_str();
+    Token extract_op();
+    Token extract_num();
+    Token extract_word();
+
+    std::string_view raw;
+    std::size_t pos;
+    std::size_t len;
+};
+
+static constexpr std::string_view metachars = "+-*/%=!~<>&|^,.-?;:(){}[]#";
+
+static const std::unordered_map<std::string_view, TokenKind> ops = {
+    {"++", TokenKind::PlusPlus},
+    {"+=", TokenKind::PlusAssign},
+    {"+",  TokenKind::Plus},
+
+    {"--", TokenKind::MinusMinus},
+    {"-=", TokenKind::MinusAssign},
+    {"->", TokenKind::Arrow},
+    {"-",  TokenKind::Minus},
+
+    {"<<", TokenKind::LessLess},
+    {"<=", TokenKind::LessAssign},
+    {"<",  TokenKind::Less},
+
+    {">>", TokenKind::GreatGreat},
+    {">=", TokenKind::GreatAssign},
+    {">",  TokenKind::Great},
+
+    {"==", TokenKind::AssignAssign},
+    {"=",  TokenKind::Assign},
+
+    {"!=", TokenKind::ExclAssign},
+    {"!",  TokenKind::Excl},
+
+    {"&&", TokenKind::AmperAmper},
+    {"&=", TokenKind::AmperAssign},
+    {"&",  TokenKind::Amper},
+
+    {"||", TokenKind::PipePipe},
+    {"|=", TokenKind::PipeAssign},
+    {"|",  TokenKind::Pipe},
+
+    {"^",  TokenKind::Carret},
+    {"~",  TokenKind::Tilda},
+
+    {"*",  TokenKind::Star},
+    {"/=", TokenKind::SlashAssign},
+    {"/",  TokenKind::Slash},
+    {"%",  TokenKind::Perc},
+    {"%=", TokenKind::PercAssign},
+
+    {",", TokenKind::Comma},
+    {".", TokenKind::Dot},
+    {"?", TokenKind::Question},
+    {":", TokenKind::Colon},
+    {";", TokenKind::Semicolon},
+    {"(", TokenKind::LPar},
+    {")", TokenKind::RPar},
+    {"{", TokenKind::LBlock},
+    {"}", TokenKind::RBlock},
+    {"[", TokenKind::LBrace},
+    {"]", TokenKind::RBrace},
+    {"#", TokenKind::Hash},
 };
