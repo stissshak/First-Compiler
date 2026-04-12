@@ -9,7 +9,7 @@ bool Lexer::is_end() const{
 }
 
 bool Lexer::start_num() const{
-    return std::isdigit(peek()) || peek() == '.';
+    return std::isdigit(peek()) || (peek() == '.' && pos + 1 < len && std::isdigit(raw[pos+1]));
 }
 
 char Lexer::peek() const{
@@ -68,6 +68,7 @@ Token Lexer::extract_op(){
         pos += 1;
         return Token{it->second, one};
     }
+    take();
     return Token{TokenKind::Invalid, {}};
 }
 
@@ -75,11 +76,10 @@ Token Lexer::extract_num(){
     std::size_t start = pos;
     bool dot = false;
 
-    if(peek() == '.' && !std::isdigit(raw[pos + 1])) return extract_op();
     while(!is_end()){
         char c = peek();
 
-        if(std::isdigit(c)) take();
+        if(std::isdigit(static_cast<unsigned char>(c))) take();
         else if(c == '.' && !dot){
             dot = true;
             take();
@@ -94,11 +94,16 @@ Token Lexer::extract_num(){
 Token Lexer::extract_word(){
     std::size_t start = pos;
     
-    while(!is_end() &&!std::isspace(peek()) && !metachars.contains(peek())){
+    while(!is_end() &&!(std::isalnum(static_cast<unsigned char>(peek())) || peek() == '_')){
         take();
     }
     
     std::string_view word = raw.substr(start, pos - start);
-    return Token{TokenKind::Word, word};
+
+    if(auto it = keys.find(word); it != keys.end()){
+        return Token{it->second, word};
+    }
+
+    return Token{TokenKind::Identifier, word};
 }
 

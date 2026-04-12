@@ -8,7 +8,7 @@
 enum class TokenKind{
     Int,
     Float,
-    Word,
+    Identifier,
     String,
 
     Plus,       // +
@@ -53,8 +53,22 @@ enum class TokenKind{
     RPar,       // )
     LBlock,     // {
     RBlock,     // }
-    LBrace,     // [
-    RBrace,     // ]
+    LBracket,   // [
+    RBracket,   // ]
+
+    If,
+    Else,
+    For,
+    While,
+    Switch,
+    Case,
+    Return,
+
+    IntK,
+    FloatK,
+    CharK,
+    VoidK,
+    
 
     Hash,       // #
     Invalid,

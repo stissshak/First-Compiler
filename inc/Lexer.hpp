@@ -80,7 +80,22 @@ static const std::unordered_map<std::string_view, TokenKind> ops = {
     {")", TokenKind::RPar},
     {"{", TokenKind::LBlock},
     {"}", TokenKind::RBlock},
-    {"[", TokenKind::LBrace},
-    {"]", TokenKind::RBrace},
+    {"[", TokenKind::LBracket},
+    {"]", TokenKind::RBracket},
     {"#", TokenKind::Hash},
+};
+
+static const std::unordered_map<std::string_view, TokenKind> keys = {
+    {"if", TokenKind::If},
+    {"else", TokenKind::Else},
+    {"for",  TokenKind::For},
+    {"while", TokenKind::While},
+    {"switch", TokenKind::Switch},
+    {"case", TokenKind::Case},
+    {"return", TokenKind::Return},
+    {"int", TokenKind::IntK},
+    {"float", TokenKind::FloatK},
+    {"char", TokenKind::CharK},
+    {"void", TokenKind::VoidK},
+
 };
