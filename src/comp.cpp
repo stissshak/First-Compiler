@@ -4,6 +4,8 @@
 
 #include "Input.hpp"
 #include "Lexer.hpp"
+#include "Parser.hpp"
+#include "AstPrinter.hpp"
 
 using namespace std;
 
@@ -15,7 +17,8 @@ int main(int argc, char *argv[]){
     string s = ib.get_buffer();
     cout << s;
     auto arr = Lexer(s).tokenize();
-    for(auto i : arr){
-        cout << i.data << endl;     
-    }
+    cout << "oh no" << std::endl;
+    auto tu = Parser(arr).parse();
+    AstPrinter().print(*tu);
+    
 }

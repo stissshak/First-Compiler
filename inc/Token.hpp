@@ -63,6 +63,8 @@ enum class TokenKind{
     Switch,
     Case,
     Return,
+    Break,
+    Continue,
 
     IntK,
     FloatK,

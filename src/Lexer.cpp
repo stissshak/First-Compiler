@@ -94,7 +94,7 @@ Token Lexer::extract_num(){
 Token Lexer::extract_word(){
     std::size_t start = pos;
     
-    while(!is_end() &&!(std::isalnum(static_cast<unsigned char>(peek())) || peek() == '_')){
+    while(!is_end() && (std::isalnum(static_cast<unsigned char>(peek())) || peek() == '_')){
         take();
     }
     

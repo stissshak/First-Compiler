@@ -93,6 +93,8 @@ static const std::unordered_map<std::string_view, TokenKind> keys = {
     {"switch", TokenKind::Switch},
     {"case", TokenKind::Case},
     {"return", TokenKind::Return},
+    {"break", TokenKind::Break},
+    {"continue", TokenKind::Continue},
     {"int", TokenKind::IntK},
     {"float", TokenKind::FloatK},
     {"char", TokenKind::CharK},

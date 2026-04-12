@@ -16,12 +16,12 @@ private:
     bool isEnd() const;
     const Token& peek(std::size_t shift=0) const;
     const Token& take();
-	bool match(TokenKind kind, std::size_t shift=0);
+	bool match(TokenKind kind);
 	void except(TokenKind kind);
 
 	// declarations
 	std::unique_ptr<Decl> parseDecl();
-	std::unique_ptr<VarDecl> Parser::parseParam();
+	std::unique_ptr<VarDecl> parseParam();
 	std::unique_ptr<Decl> parseFunction();
 	std::unique_ptr<Decl> parseVarDecl();
 	
@@ -31,11 +31,12 @@ private:
 	std::unique_ptr<Stmt> parseIf();
 	std::unique_ptr<Stmt> parseWhile();
 	std::unique_ptr<Stmt> parseFor();
+	std::unique_ptr<Stmt> parseReturn();
 	std::unique_ptr<Stmt> parseExprStmt();
 	
 	// expressions
 	std::unique_ptr<Expr> parseExpr();
-	std::unique_ptr<Expr> parseBinary(int minPrec);
+	std::unique_ptr<Expr> parseBinary(int minPrec=0);
 	std::unique_ptr<Expr> parseUnary();
 	std::unique_ptr<Expr> parsePostfix();
 	std::unique_ptr<Expr> parsePrimary();
