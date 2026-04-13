@@ -1,0 +1,51 @@
+// MPL/inc/AstInter.hpp
+
+#pragma once
+
+#include <string>
+#include <vector>
+
+#include "AstVisitor.hpp"
+#include "Ast.hpp"
+
+class AstInter : public AstVisitor {
+public:
+    void inter(TranslationUnit& unit);
+
+private:
+    std::vector<bool> isLast;
+
+    void enter(bool last);
+    void leave();
+
+    std::string typeName(Type* type);
+    std::string binaryOpName(BinaryOp op);
+    std::string unaryOpName(UnaryOp op);
+
+    void visit(TranslationUnit&) override;
+    void visit(VarDecl&)         override;
+    void visit(FuncDecl&)        override;
+    void visit(BlockStmt&)       override;
+    void visit(ExprStmt&)        override;
+    void visit(IfStmt&)          override;
+    void visit(WhileStmt&)       override;
+    void visit(ForStmt&)         override;
+    void visit(ReturnStmt&)      override;
+    void visit(BreakStmt&)       override;
+    void visit(ContinueStmt&)    override;
+    void visit(DeclStmt&)        override;
+    void visit(BinaryExpr&)      override;
+    void visit(UnaryExpr&)       override;
+    void visit(CallExpr&)        override;
+    void visit(IndexExpr&)       override;
+    void visit(AccessExpr&)      override;
+    void visit(IntLiteral&)      override;
+    void visit(FloatLiteral&)    override;
+    void visit(StringLiteral&)   override;
+    void visit(Identifier&)      override;
+    void visit(BuiltinType&)     override;
+    void visit(PointerType&)     override;
+
+    int depth = 0;
+    bool lastChild = true;
+};

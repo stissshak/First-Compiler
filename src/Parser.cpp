@@ -411,7 +411,7 @@ std::unique_ptr<Expr> Parser::parseBinary(int minPrior){
 }
 
 std::unique_ptr<Expr> Parser::parseUnary(){
-	const Token tok = peek();
+	const Token &tok = peek();
 
 	std::unique_ptr<UnaryExpr> node = nullptr;
 	switch(tok.kind){
@@ -465,7 +465,7 @@ std::unique_ptr<Expr> Parser::parseUnary(){
 std::unique_ptr<Expr> Parser::parsePostfix(){
 	auto expr = parsePrimary();	
 	while(true) {
-        const Token tok = peek();
+        const Token &tok = peek();
 
         switch(tok.kind) {
             case TokenKind::LPar: 
@@ -511,7 +511,7 @@ std::unique_ptr<Expr> Parser::parsePostfix(){
                 if(peek().kind != TokenKind::Identifier)
                     throw std::runtime_error("Expected field after '.'");
 
-                access->field = std::string(take().data);
+                access->field = take().data;
 
                 expr = std::move(access);
                 break;
@@ -527,7 +527,7 @@ std::unique_ptr<Expr> Parser::parsePostfix(){
                 if(peek().kind != TokenKind::Identifier)
                     throw std::runtime_error("Expected field after '->'");
 
-                access->field = std::string(take().data);
+                access->field = take().data;
 
                 expr = std::move(access);
                 break;
@@ -557,7 +557,7 @@ std::unique_ptr<Expr> Parser::parsePostfix(){
 }
 
 std::unique_ptr<Expr> Parser::parsePrimary(){
-	const Token tok = peek();
+	const Token &tok = peek();
 
 	switch(tok.kind){
 		case TokenKind::Int:
@@ -578,14 +578,14 @@ std::unique_ptr<Expr> Parser::parsePrimary(){
 		{
 			take();
 			auto node = std::make_unique<StringLiteral>();
-			node->value = std::string(tok.data);
+			node->value = tok.data;
 			return node;
 		}
 		case TokenKind::Identifier:
 		{	
 			take();
 			auto node = std::make_unique<Identifier>();
-			node->name = std::string(tok.data);
+			node->name = tok.data;
 			return node;
 		}
 		case TokenKind::LPar:

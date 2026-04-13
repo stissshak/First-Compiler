@@ -3,6 +3,7 @@
 #include <string>
 
 #include "Input.hpp"
+#include "Preprocessor.hpp"
 #include "Lexer.hpp"
 #include "Parser.hpp"
 #include "AstPrinter.hpp"
@@ -10,15 +11,13 @@
 using namespace std;
 
 int main(int argc, char *argv[]){
-    InputBuffer ib;
+    Preprocessor p;
     if(argc < 2) return 1;
     string name = argv[1];
-    ib.load_file(name);
-    string s = ib.get_buffer();
+    string s = p.include_files(name);
     cout << s;
-    auto arr = Lexer(s).tokenize();
-    cout << "oh no" << std::endl;
-    auto tu = Parser(arr).parse();
+    auto arrTokens = Lexer(s).tokenize();
+    auto tu = Parser(arrTokens).parse();
     AstPrinter().print(*tu);
     
 }
