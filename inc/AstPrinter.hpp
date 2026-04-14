@@ -25,6 +25,7 @@ private:
 
     void visit(TranslationUnit&) override;
     void visit(VarDecl&)         override;
+    void visit(StructDecl&)      override;
     void visit(FuncDecl&)        override;
     void visit(BlockStmt&)       override;
     void visit(ExprStmt&)        override;

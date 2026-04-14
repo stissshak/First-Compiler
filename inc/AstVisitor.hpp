@@ -3,7 +3,7 @@
 #pragma once
 
 struct TranslationUnit;
-struct VarDecl; struct FuncDecl;
+struct VarDecl; struct FuncDecl; struct StructDecl;
 struct BlockStmt; struct ExprStmt; struct IfStmt;
 struct WhileStmt; struct ForStmt; struct ReturnStmt;
 struct BreakStmt; struct ContinueStmt; struct DeclStmt;
@@ -18,6 +18,7 @@ struct AstVisitor{
 
     virtual void visit(TranslationUnit&) = 0;
     virtual void visit(VarDecl&) = 0;
+    virtual void visit(StructDecl&) = 0;
     virtual void visit(FuncDecl&) = 0;
 
     virtual void visit(BlockStmt&) = 0;

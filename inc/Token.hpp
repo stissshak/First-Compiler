@@ -66,6 +66,8 @@ enum class TokenKind{
     Break,
     Continue,
 
+    Struct,
+
     IntK,
     FloatK,
     CharK,

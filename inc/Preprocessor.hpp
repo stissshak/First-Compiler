@@ -36,6 +36,8 @@ public:
         res.append(content, last_pos, std::string::npos);
         return res;
     }
+
+
 private:
 
 };

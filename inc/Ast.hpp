@@ -47,6 +47,13 @@ struct FuncDecl : Decl{
 	ACCEPT
 };
 
+struct StructDecl : Decl{
+	std::string_view name;
+	std::vector<std::unique_ptr<VarDecl>> fields;
+
+	ACCEPT
+};
+
 // Stmt
 struct BlockStmt : Stmt{
 	std::vector<std::unique_ptr<Stmt>> statements;

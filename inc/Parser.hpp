@@ -21,6 +21,7 @@ private:
 
 	// declarations
 	std::unique_ptr<Decl> parseDecl();
+	std::unique_ptr<Decl> parseStruct();
 	std::unique_ptr<VarDecl> parseParam();
 	std::unique_ptr<Decl> parseFunction();
 	std::unique_ptr<Decl> parseVarDecl();

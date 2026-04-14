@@ -23,6 +23,7 @@ private:
     std::string unaryOpName(UnaryOp op);
 
     void visit(TranslationUnit&) override;
+    void visit(StructDecl&)      override;
     void visit(VarDecl&)         override;
     void visit(FuncDecl&)        override;
     void visit(BlockStmt&)       override;

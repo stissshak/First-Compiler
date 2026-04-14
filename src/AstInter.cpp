@@ -86,6 +86,8 @@ void AstInter::visit(TranslationUnit& node) {
     }
 }
 
+void AstInter::visit(StructDecl& node) {}
+
 void AstInter::visit(FuncDecl& node) {
     std::cout << "FuncDecl '" << node.name
               << "' -> " << typeName(node.returnType.get()) << "\n";

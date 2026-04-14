@@ -100,4 +100,6 @@ static const std::unordered_map<std::string_view, TokenKind> keys = {
     {"char", TokenKind::CharK},
     {"void", TokenKind::VoidK},
 
+    {"struct", TokenKind::Struct},
+
 };

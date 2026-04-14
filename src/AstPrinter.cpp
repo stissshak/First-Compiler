@@ -94,6 +94,29 @@ void AstPrinter::visit(TranslationUnit& node) {
     }
 }
 
+void AstPrinter::visit(StructDecl& node){
+    std::cout << "StructDecl '" << node.name << "'\n";
+    {
+        bool last = false;
+        printIndent(last);
+        std::cout << "Fields";
+        if (node.fields.empty()) {
+            std::cout << ": (none)\n";
+        } else {
+            std::cout << "\n";
+            enter(last);
+            for (std::size_t i = 0; i < node.fields.size(); ++i) {
+                bool l = (i == node.fields.size() - 1);
+                printIndent(l);
+                enter(l);
+                node.fields[i]->accept(*this);
+                leave();
+            }
+            leave();
+        }
+    } 
+}
+
 void AstPrinter::visit(FuncDecl& node) {
     std::cout << "FuncDecl '" << node.name
               << "' -> " << typeName(node.returnType.get()) << "\n";

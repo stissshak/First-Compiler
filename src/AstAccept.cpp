@@ -3,6 +3,7 @@
 
 void TranslationUnit::accept(AstVisitor& v) { v.visit(*this); }
 void VarDecl::accept(AstVisitor& v)         { v.visit(*this); }
+void StructDecl::accept(AstVisitor& v)      { v.visit(*this); }
 void FuncDecl::accept(AstVisitor& v)        { v.visit(*this); }
 void BlockStmt::accept(AstVisitor& v)       { v.visit(*this); }
 void ExprStmt::accept(AstVisitor& v)        { v.visit(*this); }

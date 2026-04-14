@@ -107,6 +107,9 @@ std::unique_ptr<Type> Parser::parseType() {
 // declaraion
 
 std::unique_ptr<Decl> Parser::parseDecl(){
+	if(match(TokenKind::Struct)){
+		return parseStruct();
+	}
 	if(isType(peek().kind)){
 
 		int i = 1;
@@ -134,6 +137,26 @@ std::unique_ptr<VarDecl> Parser::parseParam(){
     var->type = std::move(type);
     var->name = name.data;
     return var;
+}
+
+
+std::unique_ptr<Decl> Parser::parseStruct(){
+	if(peek().kind != TokenKind::Identifier)
+    	throw std::runtime_error("Expected identifier");
+	auto name = take().data;
+	except(TokenKind::LBlock);
+	auto fields = std::vector<std::unique_ptr<VarDecl>>();
+	while(!isEnd() && peek().kind != TokenKind::RBlock){
+		fields.push_back(parseParam());
+		if(!match(TokenKind::Semicolon)) break; 
+	}
+	except(TokenKind::RBlock);
+	except(TokenKind::Semicolon);
+
+	auto stct = std::make_unique<StructDecl>();
+	stct->name = name;
+	stct->fields = std::move(fields);
+	return stct;
 }
 
 
