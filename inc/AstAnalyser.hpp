@@ -1,4 +1,4 @@
-// MPL/inc/AstInter.hpp
+// MPL/inc/AstAnalyser.hpp
 
 #pragma once
 
@@ -8,23 +8,17 @@
 #include "AstVisitor.hpp"
 #include "Ast.hpp"
 
-class AstInter : public AstVisitor {
+struct DeclInfo;
+struct Scope;
+
+class AstAnalyser : public AstVisitor {
 public:
-    void inter(TranslationUnit& unit);
+    void analyse(TranslationUnit& unit);
 
 private:
-    std::vector<bool> isLast;
-
-    void enter(bool last);
-    void leave();
-
-    std::string typeName(Type* type);
-    std::string binaryOpName(BinaryOp op);
-    std::string unaryOpName(UnaryOp op);
-
     void visit(TranslationUnit&) override;
-    void visit(StructDecl&)      override;
     void visit(VarDecl&)         override;
+    void visit(StructDecl&)      override;
     void visit(FuncDecl&)        override;
     void visit(BlockStmt&)       override;
     void visit(ExprStmt&)        override;
@@ -42,11 +36,31 @@ private:
     void visit(AccessExpr&)      override;
     void visit(IntLiteral&)      override;
     void visit(FloatLiteral&)    override;
+    void visit(CharLiteral&)     override;
     void visit(StringLiteral&)   override;
     void visit(Identifier&)      override;
     void visit(BuiltinType&)     override;
     void visit(PointerType&)     override;
 
-    int depth = 0;
-    bool lastChild = true;
+    Scope *main, *prev;
+    Type *curType, *retType;
+    bool isInLoop;
+    
+    // func type
+    // curnt type
+
+    BuiltinType intType{BuiltinTypes::Int, ""};
+    BuiltinType floatType{BuiltinTypes::Float, ""};
+    BuiltinType charType{BuiltinTypes::Char, ""};
+    BuiltinType voidType{BuiltinTypes::Void, ""};
+    BuiltinType customType{BuiltinTypes::Custom, ""};
+    PointerType pointType{nullptr};
 };
+
+
+
+fmas[i](x)
+
+fmas -> scope
+
+fmas[i] - Func -> FuncType(x)

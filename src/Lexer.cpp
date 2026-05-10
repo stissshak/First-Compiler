@@ -1,4 +1,4 @@
-// /src/Lexer.cpp
+// MPL/src/Lexer.cpp
 
 #include "Lexer.hpp"
 
@@ -34,6 +34,7 @@ Token Lexer::extract(){
         return Token{TokenKind::Eof, {}};
     }
     if(peek() == '"') return extract_str();
+    if(peek() == '\'') return extract_char();
     if(metachars.contains(peek())) return extract_op();
     if(start_num()) return extract_num();
     return extract_word();
@@ -55,6 +56,17 @@ Token Lexer::extract_str(){
     take();
     std::string_view str = raw.substr(start, pos - start);
     return Token{TokenKind::String, str};
+}
+
+Token Lexer::extract_char(){
+    std::size_t start = pos;
+    take();
+    
+    char c = take();
+
+    if(peek() != '\'') return Token{TokenKind::Invalid, raw.substr(start, pos - start)};
+    take();
+    return Token{TokenKind::Char, raw.substr(start, pos - start)};
 }
 
 Token Lexer::extract_op(){
@@ -106,4 +118,3 @@ Token Lexer::extract_word(){
 
     return Token{TokenKind::Identifier, word};
 }
-

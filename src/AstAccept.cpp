@@ -21,6 +21,7 @@ void IndexExpr::accept(AstVisitor& v)       { v.visit(*this); }
 void AccessExpr::accept(AstVisitor& v)      { v.visit(*this); }
 void IntLiteral::accept(AstVisitor& v)      { v.visit(*this); }
 void FloatLiteral::accept(AstVisitor& v)    { v.visit(*this); }
+void CharLiteral::accept(AstVisitor& v)     { v.visit(*this); }
 void StringLiteral::accept(AstVisitor& v)   { v.visit(*this); }
 void Identifier::accept(AstVisitor& v)      { v.visit(*this); }
 void BuiltinType::accept(AstVisitor& v)     { v.visit(*this); }

@@ -8,6 +8,7 @@
 enum class TokenKind{
     Int,
     Float,
+    Char,
     Identifier,
     String,
 

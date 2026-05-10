@@ -89,7 +89,7 @@ struct WhileStmt : Stmt{
 };
 
 struct ForStmt : Stmt{
-	std::unique_ptr<Node> init;
+	std::unique_ptr<Node> init; // Variant<Expr, Decl>
 	std::unique_ptr<Expr> cond;
 	std::unique_ptr<Expr> incr;
 	std::unique_ptr<Stmt> body;
@@ -98,7 +98,7 @@ struct ForStmt : Stmt{
 };
 
 struct ReturnStmt : Stmt{
-	std::unique_ptr<Expr> value;
+	std::unique_ptr<Expr> value; 
 
 	ACCEPT
 };
@@ -184,6 +184,12 @@ struct FloatLiteral : Expr{
 	ACCEPT
 };
 
+struct CharLiteral : Expr{
+	char value;
+
+	ACCEPT
+};
+
 struct StringLiteral : Expr{
 	std::string_view value;
 
@@ -199,12 +205,14 @@ struct Identifier : Expr{
 // Type
 
 enum class BuiltinTypes{
-	Int, Float, Char, Void
+	Int, Float, Char, Void, Custom
 };
 
 struct BuiltinType : Type{
 	BuiltinTypes type;
+	std::string_view name;
 	BuiltinType(BuiltinTypes bt) : type(bt) {}
+	BuiltinType(BuiltinTypes bt, std::string_view name) : type(bt), name(name) {}
 
 	ACCEPT
 };

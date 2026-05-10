@@ -19,6 +19,7 @@ private:
     char take();
     Token extract();
     Token extract_str();
+    Token extract_char();
     Token extract_op();
     Token extract_num();
     Token extract_word();

@@ -78,6 +78,7 @@ bool isType(TokenKind kind){
 		case TokenKind::FloatK:
 		case TokenKind::CharK:
 		case TokenKind::VoidK:
+		case TokenKind::Identifier:
 			return true;
 		default:
 			return false;
@@ -98,8 +99,8 @@ std::unique_ptr<Type> Parser::parseType() {
 		case TokenKind::VoidK:
 			take();
 			return std::make_unique<BuiltinType>(BuiltinTypes::Void);
-        default:
-            throw std::runtime_error("Expected type");
+		default:
+            return std::make_unique<BuiltinType>(BuiltinTypes::Custom, peek().data);
     }
 }
 
@@ -595,6 +596,13 @@ std::unique_ptr<Expr> Parser::parsePrimary(){
 			take();
 			auto node = std::make_unique<FloatLiteral>();
 			node->value = svtod(tok.data);
+			return node;
+		}
+		case TokenKind::Char:
+		{
+			take();
+			auto node = std::make_unique<CharLiteral>();
+			node->value = tok.data[0];
 			return node;
 		}
 		case TokenKind::String:

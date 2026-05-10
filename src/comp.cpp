@@ -23,3 +23,19 @@ int main(int argc, char *argv[]){
     AstPrinter().print(*tu);
     
 }
+
+
+// CLI - argv
+// Source
+// Frontend - Lexer/Parser/Analyzer
+// Backend - IR/Codegen
+// Compiler
+
+// var declaraion
+// typedef
+// cast
+// IR
+// analyser - type
+// unsigned(?)
+// 
+

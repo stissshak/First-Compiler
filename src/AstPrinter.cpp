@@ -397,6 +397,10 @@ void AstPrinter::visit(FloatLiteral& node) {
     std::cout << "FloatLiteral " << node.value << "\n";
 }
 
+void AstPrinter::visit(CharLiteral& node) {
+    std::cout << "CharLiteral " << node.value << "\n";
+}
+
 void AstPrinter::visit(StringLiteral& node) {
     std::cout << "StringLiteral \"" << node.value << "\"\n";
 }

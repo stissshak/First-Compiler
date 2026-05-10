@@ -9,7 +9,7 @@ struct WhileStmt; struct ForStmt; struct ReturnStmt;
 struct BreakStmt; struct ContinueStmt; struct DeclStmt;
 struct BinaryExpr; struct UnaryExpr; struct CallExpr;
 struct IndexExpr; struct AccessExpr;
-struct IntLiteral; struct FloatLiteral; struct StringLiteral;
+struct IntLiteral; struct FloatLiteral; struct CharLiteral; struct StringLiteral;
 struct Identifier;
 struct BuiltinType; struct PointerType; struct ArrayType;
 
@@ -38,6 +38,7 @@ struct AstVisitor{
     virtual void visit(AccessExpr&) = 0;
     virtual void visit(IntLiteral&) = 0;
     virtual void visit(FloatLiteral&) = 0;
+    virtual void visit(CharLiteral&) = 0;
     virtual void visit(StringLiteral&) = 0;
     virtual void visit(Identifier&) = 0;
 
