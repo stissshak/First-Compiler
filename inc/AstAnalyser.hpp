@@ -42,9 +42,9 @@ private:
     void visit(BuiltinType&)     override;
     void visit(PointerType&)     override;
 
-    Scope *main, *prev;
-    Type *curType, *retType;
-    bool isInLoop;
+    Scope *curScope = nullptr;
+    Type *curType = nullptr, *retType = nullptr;
+    bool isInLoop = false;
     
     // func type
     // curnt type
@@ -58,9 +58,3 @@ private:
 };
 
 
-
-fmas[i](x)
-
-fmas -> scope
-
-fmas[i] - Func -> FuncType(x)

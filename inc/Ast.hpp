@@ -7,7 +7,6 @@
 #include <memory>
 #include <vector>
 
-
 struct AstVisitor;
 
 #define ACCEPT void accept(AstVisitor& v) override;
@@ -169,7 +168,7 @@ struct CastExpr : Expr{
 	std::unique_ptr<Type> target;
 	std::unique_ptr<Expr> expr;
 
-	//ACCEPT
+	ACCEPT
 };
 
 struct IntLiteral : Expr{
@@ -204,6 +203,7 @@ struct Identifier : Expr{
 
 // Type
 
+
 enum class BuiltinTypes{
 	Int, Float, Char, Void, Custom
 };
@@ -219,6 +219,7 @@ struct BuiltinType : Type{
 
 struct PointerType : Type{
 	std::unique_ptr<Type> base;
+	PointerType(std::unique_ptr<Type> b = nullptr) : base(std::move(b)) {}
 
 	ACCEPT
 };
@@ -245,3 +246,4 @@ struct FuncType : Type{
 // По наполнению зависит от нас, от студентов, многие из узлов содержат указатели на другие узлы 
 // decl = func, class, typedef, tampletes, alies
 
+#include "Types.hpp"

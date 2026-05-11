@@ -7,6 +7,7 @@
 #include "Lexer.hpp"
 #include "Parser.hpp"
 #include "AstPrinter.hpp"
+#include "AstAnalyser.hpp"
 
 using namespace std;
 
@@ -21,7 +22,7 @@ int main(int argc, char *argv[]){
     auto tu = Parser(arrTokens).parse();
     cout << "AST:" << std::endl;
     AstPrinter().print(*tu);
-    
+    AstAnalyser().analyse(*tu);
 }
 
 

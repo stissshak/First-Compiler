@@ -6,8 +6,8 @@
 
 #include "AstAnalyser.hpp"
 
-// Таблица переменных/функций
-// scope функции
+// TODO 
+// Logger, AccessExpr - Scope loop, StringLiteral/FuncType - MakeType
 
 enum class DeclType{
     Var, Func, Struct
@@ -43,21 +43,29 @@ void AstAnalyser::analyse(TranslationUnit& unit){
 
 
 void AstAnalyser::visit(TranslationUnit& node){
-    prev = nullptr;
-    main = new Scope;
-    main->parent = nullptr;
+    curScope = new Scope;
+    curScope->parent = nullptr;
     for(std::size_t i = 0; i < node.decls.size(); ++i){
         node.decls[i]->accept(*this);
     }
+    delete curScope;
 }
 void AstAnalyser::visit(VarDecl& node){
     DeclInfo di = {varInfo{node.type.get(), node.init != nullptr}};
 
-    if (main->names.find(node.name) != main->names.end()) {
+    if(curScope->names.find(node.name) != curScope->names.end()){
         // TODO Logger
         return;
     }
-    main->names.emplace(node.name, di);
+
+    if(node.init){
+        node.init->accept(*this);
+        if(!typesImplicible(node.type.get(), curType)){
+            // TODO Logger
+        }
+    }
+
+    curScope->names.emplace(node.name, di);
 }
 
 void AstAnalyser::visit(StructDecl& node){
@@ -68,50 +76,53 @@ void AstAnalyser::visit(StructDecl& node){
     }
 
 
-    if (main->names.find(node.name) != main->names.end()) {
+    if(curScope->names.find(node.name) != curScope->names.end()){
         // TODO Logger
         return;
     }
-    main->names.emplace(node.name, DeclInfo(si));
+    curScope->names.emplace(node.name, DeclInfo(si));
 }
 
 
 void AstAnalyser::visit(FuncDecl& node){
     funcInfo fi;
-    curType = node.returnType.get();
+    auto savedRetType = retType;
+    retType = node.returnType.get();
 
     for(auto& p: node.params){
         fi.argsType.emplace_back(p->type.get());
     }
 
-    if (main->names.find(node.name) != main->names.end()) {
+    if(curScope->names.find(node.name) != curScope->names.end()){
         // TODO Logger
         return;
     }
-    main->names.emplace(node.name, DeclInfo(fi));
+    curScope->names.emplace(node.name, DeclInfo(fi));
 
     auto funcScope = new Scope;
-    funcScope->parent = main;
-    main = funcScope;
+    funcScope->parent = curScope;
+    curScope = funcScope;
 
-    for (auto& p : node.params)
-        main->names.emplace(p->name, DeclInfo{varInfo{p->type.get(), true}});
+    for(auto& p : node.params)
+        curScope->names.emplace(p->name, DeclInfo{varInfo{p->type.get(), true}});
 
     node.body->accept(*this);
+    curScope = funcScope->parent;
+    retType = savedRetType;
     delete funcScope;
 }
 
 
 void AstAnalyser::visit(BlockStmt& node){
     auto blockScope = new Scope;
-    blockScope->parent = main;
-    main = blockScope;
+    blockScope->parent = curScope;
+    curScope = blockScope;
 
     for(auto& s: node.statements){
         s->accept(*this);
     }
 
-    main = main->parent;
+    curScope = curScope->parent;
     delete blockScope;
 }
 
@@ -129,27 +140,29 @@ void AstAnalyser::visit(IfStmt& node){
 
 
 void AstAnalyser::visit(WhileStmt& node){
+    auto wasInLoop = isInLoop;
     isInLoop = true;
     node.cond->accept(*this);
     node.body->accept(*this);
-    isInLoop = false;
+    isInLoop = wasInLoop;
 }
 
 
 void AstAnalyser::visit(ForStmt& node){
+    auto wasInLoop = isInLoop;
     isInLoop = true;
     auto forScope = new Scope;
-    forScope->parent = main;
-    main = forScope;
+    forScope->parent = curScope;
+    curScope = forScope;
 
     if(node.init != nullptr) node.init->accept(*this);
     if(node.cond != nullptr) node.cond->accept(*this);
     if(node.incr != nullptr) node.incr->accept(*this);
     node.body->accept(*this);
 
-    main = main->parent;
+    curScope = curScope->parent;
     delete forScope;
-    isInLoop = false;
+    isInLoop = wasInLoop;
 }
 
 
@@ -159,7 +172,7 @@ void AstAnalyser::visit(ReturnStmt& node){
     }
     if(node.value) node.value->accept(*this);
     else curType = &voidType;
-    if(retType != curType){
+    if(!typesImplicible(retType, curType)){
         // TODO Logger
     }
 }
@@ -190,14 +203,55 @@ void AstAnalyser::visit(BinaryExpr& node){
     node.right->accept(*this);
     auto rType = curType;
 
-    if(lType != rType){
+    if(!typesImplicible(lType, rType)){
         // TODO Logger
     }
+
+    switch(node.op){
+        case BinaryOp::Less:
+        case BinaryOp::Greater:
+        case BinaryOp::Equal:
+        case BinaryOp::NotEqual:
+        case BinaryOp::LessEqual:
+        case BinaryOp::GreaterEqual:
+        case BinaryOp::And:
+        case BinaryOp::Or:
+            curType = &intType;
+            break;
+        default:
+            curType = lType;
+            break;
+    }
+
 }
 
 
 void AstAnalyser::visit(UnaryExpr& node){
-    
+    node.child->accept(*this);
+
+    switch(node.op){
+        case UnaryOp::Pos:
+        case UnaryOp::Neg:
+        case UnaryOp::PreInc:
+        case UnaryOp::PreDec:
+        case UnaryOp::PostInc:
+        case UnaryOp::PostDec:
+            break;
+        case UnaryOp::Not:
+            curType = &intType;
+            break;
+        case UnaryOp::AddressOf:
+            // TODO pointer problem
+            break;
+        case UnaryOp::Deref:
+        if(auto pt = dynamic_cast<PointerType*>(curType)){
+            curType = pt->base.get();
+        } else {
+            // TODO Logger
+        }
+        break;
+
+    }
 }
 
 
@@ -208,21 +262,89 @@ void AstAnalyser::visit(CallExpr& node){
         // TODO Logger
     }
     else{
-        for(auto &p: node.param){
-
+        if(node.param.size() != fType->params.size()){
+            // TODO Logger
         }
-        curType = fType->returnType.get();
+        else{
+            for(std::size_t i = 0; i < node.param.size(); ++i){
+                node.param[i]->accept(*this);
+                if(!typesImplicible(curType, fType->params[i].get())){
+                    // TODO Logger: type not allowed
+                }
+
+            }
+            curType = fType->returnType.get();
+        }
     }
 }
 
 
 void AstAnalyser::visit(IndexExpr& node){
+    node.index->accept(*this);
+    if(curType != &intType){
+        // TODO Logger: must be integer
+    }
+
+    node.arr->accept(*this);
+    if(auto at = dynamic_cast<ArrayType*>(curType)){
+        curType = at->elemType.get();
+    }
+    else{
+        // TODO Logger: not array
+    }
 
 }
 
-
+// TODO all scopes
 void AstAnalyser::visit(AccessExpr& node){
-    node.
+    node.object->accept(*this);
+    switch(node.kind){
+        case(AccessKind::Dot):{
+            auto typeName = dynamic_cast<BuiltinType*>(curType)->name;
+            auto it = curScope->names.find(typeName);
+            if(it == curScope->names.end()){
+                // TODO Logger: type not found
+                break;
+            }
+            auto si = std::get_if<strctInfo>(&it->second.info);
+            if(si == nullptr){
+                // TODO Logger: not a structure
+                break;
+            }
+            for(auto& f : si->fields){
+                if(f.first == node.field){
+                    curType = std::get<varInfo>(f.second.info).varType;
+                    return;
+                }
+            }
+            // TODO Logger: field not found
+            break;
+        }
+        case(AccessKind::Arrow):{
+            auto typeName = static_cast<BuiltinType*>(dynamic_cast<PointerType*>(curType)->base.get())->name;
+            auto it = curScope->names.find(typeName);
+            if(it == curScope->names.end()){
+                // TODO Logger: type not found
+                break;
+            }
+            auto si = std::get_if<strctInfo>(&it->second.info);
+            if(si == nullptr){
+                // TODO Logger: not a structure
+                break;
+            }
+            for(auto& f : si->fields){
+                if(f.first == node.field){
+                    curType = std::get<varInfo>(f.second.info).varType;
+                    return;
+                }
+            }
+            // TODO Logger: field not found
+            break;
+        }
+        default:
+            // Logger
+            break;
+    }
 }
 
 
@@ -246,18 +368,25 @@ void AstAnalyser::visit(StringLiteral& node){
 
 
 void AstAnalyser::visit(Identifier& node){
-    for(Scope* s = main; s; s = s->parent){
-          auto it = s->names.find(node.name);
-          if (it == s->names.end()) continue;
-          if (auto* v = std::get_if<varInfo>(&it->second.info)) {
-              curType = v->varType;
-              if (!v->inited) /* TODO Logger*/;
-              return;
-          }
-          // TODO Logger
-          return;
+    for(Scope* s = curScope; s; s = s->parent){
+        auto it = s->names.find(node.name);
+        if(it == s->names.end()) continue;
+        if(auto v = std::get_if<varInfo>(&it->second.info)){
+            curType = v->varType;
+            if(!v->inited){
+                /* TODO Logger*/;
+            }
+            return;
+        }
+        if(auto f = std::get_if<funcInfo>(&it->second.info)){
+            curType = f->retType; // TODO FuncType;
+            return;
+        }
+          
+        // TODO Logger
+        return;
       }
-      // TODO Logger
+    // TODO Logger
 }
 
 

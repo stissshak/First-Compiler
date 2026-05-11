@@ -39,7 +39,7 @@ $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
 	$(CC) $(CFLAGS) -MMD -MP -MF $(DEP_DIR)/$*.d -c $< -o $@
 
 clean:
-	@rm -rf $(OBJ) $(DEP) $(EXE)
+	@rm -rf $(OBJ_DIR) $(DEP_Dir) $(BIN_DIR)
 	@echo "Directory is clean"
 
 -include $(DEP)
