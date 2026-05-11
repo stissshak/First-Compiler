@@ -5,9 +5,12 @@
 #include <optional>
 
 #include "AstAnalyser.hpp"
+#include "Logger.hpp"
 
 // TODO 
 // Logger, AccessExpr - Scope loop, StringLiteral/FuncType - MakeType
+
+ConsoleLogger cl;
 
 enum class DeclType{
     Var, Func, Struct
@@ -54,14 +57,14 @@ void AstAnalyser::visit(VarDecl& node){
     DeclInfo di = {varInfo{node.type.get(), node.init != nullptr}};
 
     if(curScope->names.find(node.name) != curScope->names.end()){
-        // TODO Logger
+        cl.error("Var was declarated");
         return;
     }
 
     if(node.init){
         node.init->accept(*this);
         if(!typesImplicible(node.type.get(), curType)){
-            // TODO Logger
+            cl.error("Types is not implicible");
         }
     }
 
@@ -75,9 +78,8 @@ void AstAnalyser::visit(StructDecl& node){
        si.fields.emplace_back(f->name, DeclInfo{varInfo{f->type.get(), f->init != nullptr }});
     }
 
-
     if(curScope->names.find(node.name) != curScope->names.end()){
-        // TODO Logger
+        cl.error("Struct was declarated");
         return;
     }
     curScope->names.emplace(node.name, DeclInfo(si));
@@ -94,7 +96,7 @@ void AstAnalyser::visit(FuncDecl& node){
     }
 
     if(curScope->names.find(node.name) != curScope->names.end()){
-        // TODO Logger
+        cl.error("Func was declarated");
         return;
     }
     curScope->names.emplace(node.name, DeclInfo(fi));
@@ -168,26 +170,26 @@ void AstAnalyser::visit(ForStmt& node){
 
 void AstAnalyser::visit(ReturnStmt& node){
     if(retType == nullptr){
-        // Logger
+        cl.error("Func not returning anything");
     }
     if(node.value) node.value->accept(*this);
     else curType = &voidType;
     if(!typesImplicible(retType, curType)){
-        // TODO Logger
+        cl.error("Return type and expr not implicible");
     }
 }
 
 
 void AstAnalyser::visit(BreakStmt& node){
     if(!isInLoop){
-        // TODO Logger
+        cl.error("Break statement not at loop");
     }
 }
 
 
 void AstAnalyser::visit(ContinueStmt& node){
     if(!isInLoop){
-        // TODO Logger
+        cl.error("Continue statement not at loop");
     }
 }
 
@@ -204,7 +206,7 @@ void AstAnalyser::visit(BinaryExpr& node){
     auto rType = curType;
 
     if(!typesImplicible(lType, rType)){
-        // TODO Logger
+        cl.error("Types are not implicible");
     }
 
     switch(node.op){
@@ -247,7 +249,7 @@ void AstAnalyser::visit(UnaryExpr& node){
         if(auto pt = dynamic_cast<PointerType*>(curType)){
             curType = pt->base.get();
         } else {
-            // TODO Logger
+            cl.error("Deref of not a pointer");
         }
         break;
 
@@ -263,13 +265,13 @@ void AstAnalyser::visit(CallExpr& node){
     }
     else{
         if(node.param.size() != fType->params.size()){
-            // TODO Logger
+            cl.error("Declarated number of arguments not equal");
         }
         else{
             for(std::size_t i = 0; i < node.param.size(); ++i){
                 node.param[i]->accept(*this);
                 if(!typesImplicible(curType, fType->params[i].get())){
-                    // TODO Logger: type not allowed
+                    cl.error("Type not implicible");
                 }
 
             }
@@ -282,7 +284,7 @@ void AstAnalyser::visit(CallExpr& node){
 void AstAnalyser::visit(IndexExpr& node){
     node.index->accept(*this);
     if(curType != &intType){
-        // TODO Logger: must be integer
+        cl.error("Must be integer");
     }
 
     node.arr->accept(*this);
@@ -290,7 +292,7 @@ void AstAnalyser::visit(IndexExpr& node){
         curType = at->elemType.get();
     }
     else{
-        // TODO Logger: not array
+        cl.error("Not Array");
     }
 
 }
@@ -303,12 +305,12 @@ void AstAnalyser::visit(AccessExpr& node){
             auto typeName = dynamic_cast<BuiltinType*>(curType)->name;
             auto it = curScope->names.find(typeName);
             if(it == curScope->names.end()){
-                // TODO Logger: type not found
+                cl.error("Type not found");
                 break;
             }
             auto si = std::get_if<strctInfo>(&it->second.info);
             if(si == nullptr){
-                // TODO Logger: not a structure
+                cl.error("Not a structure");
                 break;
             }
             for(auto& f : si->fields){
@@ -317,19 +319,19 @@ void AstAnalyser::visit(AccessExpr& node){
                     return;
                 }
             }
-            // TODO Logger: field not found
+            cl.error("Struct not found");
             break;
         }
         case(AccessKind::Arrow):{
             auto typeName = static_cast<BuiltinType*>(dynamic_cast<PointerType*>(curType)->base.get())->name;
             auto it = curScope->names.find(typeName);
             if(it == curScope->names.end()){
-                // TODO Logger: type not found
+                cl.error("Type not found");
                 break;
             }
             auto si = std::get_if<strctInfo>(&it->second.info);
             if(si == nullptr){
-                // TODO Logger: not a structure
+                cl.error("Not a structure");
                 break;
             }
             for(auto& f : si->fields){
@@ -338,7 +340,7 @@ void AstAnalyser::visit(AccessExpr& node){
                     return;
                 }
             }
-            // TODO Logger: field not found
+            cl.error("Struct not found");
             break;
         }
         default:
