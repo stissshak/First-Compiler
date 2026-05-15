@@ -31,6 +31,7 @@ std::string AstPrinter::typeName(Type* type) {
             case BuiltinTypes::Float: return "float";
             case BuiltinTypes::Char:  return "char";
             case BuiltinTypes::Void:  return "void";
+            case BuiltinTypes::Custom: return std::string{b->name};
         }
     }
     if (auto* p = dynamic_cast<PointerType*>(type)) {
@@ -413,3 +414,5 @@ void AstPrinter::visit(Identifier& node) {
 
 void AstPrinter::visit(BuiltinType&) { std::cout << "BuiltinType\n"; }
 void AstPrinter::visit(PointerType&) { std::cout << "PointerType\n"; }
+void AstPrinter::visit(ArrayType&) {std::cout << "ArrayType\n"; }
+void AstPrinter::visit(FuncType&) {std::cout << "FuncType\n";}

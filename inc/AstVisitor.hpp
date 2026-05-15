@@ -11,7 +11,7 @@ struct BinaryExpr; struct UnaryExpr; struct CallExpr;
 struct IndexExpr; struct AccessExpr;
 struct IntLiteral; struct FloatLiteral; struct CharLiteral; struct StringLiteral;
 struct Identifier;
-struct BuiltinType; struct PointerType; struct ArrayType;
+struct BuiltinType; struct PointerType; struct ArrayType; struct FuncType;
 
 struct AstVisitor{
     virtual ~AstVisitor() = default;
@@ -44,4 +44,6 @@ struct AstVisitor{
 
     virtual void visit(BuiltinType&) = 0;
     virtual void visit(PointerType&) = 0;
+    virtual void visit(ArrayType&) = 0;
+    virtual void visit(FuncType&) = 0;
 };

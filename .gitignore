@@ -3,4 +3,5 @@ file.h
 .vscode/
 tmp/
 obj/
+bin/
 

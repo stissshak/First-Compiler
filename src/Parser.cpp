@@ -4,6 +4,7 @@
 #include <string>
 #include <string_view>
 #include <stdexcept>
+#include <algorithm>
 
 #include "Parser.hpp"
 
@@ -72,13 +73,17 @@ std::unique_ptr<TranslationUnit> Parser::parse(){
 
 //----------------------------------------
 
-bool isType(TokenKind kind){
-	switch(kind){
+bool Parser::isType(Token t){
+	switch(t.kind){
 		case TokenKind::IntK:
 		case TokenKind::FloatK:
 		case TokenKind::CharK:
 		case TokenKind::VoidK:
+			return true;
 		case TokenKind::Identifier:
+			if(std::find(names.begin(), names.end(), t.data) == names.end()){
+				return false;
+			}
 			return true;
 		default:
 			return false;
@@ -100,7 +105,10 @@ std::unique_ptr<Type> Parser::parseType() {
 			take();
 			return std::make_unique<BuiltinType>(BuiltinTypes::Void);
 		default:
-            return std::make_unique<BuiltinType>(BuiltinTypes::Custom, peek().data);
+			auto t = peek();
+			take();
+            return std::make_unique<BuiltinType>(BuiltinTypes::Custom , t.data);
+			
     }
 }
 
@@ -111,8 +119,7 @@ std::unique_ptr<Decl> Parser::parseDecl(){
 	if(match(TokenKind::Struct)){
 		return parseStruct();
 	}
-	if(isType(peek().kind)){
-
+	if(isType(peek())){
 		int i = 1;
 		while(!isEnd() && peek(i).kind == TokenKind::Star) ++i;
 		if(peek(i).kind != TokenKind::Identifier) throw std::runtime_error("Exepter identifier");
@@ -157,6 +164,7 @@ std::unique_ptr<Decl> Parser::parseStruct(){
 	auto stct = std::make_unique<StructDecl>();
 	stct->name = name;
 	stct->fields = std::move(fields);
+	names.push_back(name);
 	return stct;
 }
 
@@ -229,7 +237,7 @@ std::unique_ptr<Stmt> Parser::parseStmt(){
         case TokenKind::Break:    { take(); except(TokenKind::Semicolon); return std::make_unique<BreakStmt>(); }
         case TokenKind::Continue: { take(); except(TokenKind::Semicolon); return std::make_unique<ContinueStmt>(); }
 		default: 
-			if(isType(peek().kind)){
+			if(isType(peek())){
 				auto ds = std::make_unique<DeclStmt>();
                 ds->decl = parseVarDecl();
                 return ds;
@@ -295,7 +303,7 @@ std::unique_ptr<Stmt> Parser::parseFor(){
 	if(match(TokenKind::Semicolon)) {
 		init = nullptr;
 	} else {
-		if(isType(peek().kind))
+		if(isType(peek()))
 			init = parseVarDecl();
 		else
 			init = parseExprStmt();

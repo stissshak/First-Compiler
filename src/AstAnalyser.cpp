@@ -8,7 +8,7 @@
 #include "Logger.hpp"
 
 // TODO 
-// Logger, AccessExpr - Scope loop, StringLiteral/FuncType - MakeType
+// StringLiteral/FuncType - MakeType
 
 ConsoleLogger cl;
 
@@ -23,8 +23,8 @@ struct varInfo{
 
 
 struct funcInfo{
-    Type* retType;
-    std::vector<Type*> argsType;
+    FuncType* funcType;
+
 };
 
 struct strctInfo{
@@ -39,6 +39,21 @@ struct Scope{
     Scope *parent;
     std::unordered_map<std::string_view, DeclInfo> names;
 };
+
+void AstAnalyser::checkTypes(Type* a, Type* b, std::string_view msg){
+    switch (checkCast(a, b)) {
+        case castResult::Equal:
+        case castResult::Implicit:
+            break;
+        case castResult::Warn:
+            cl.warning(msg);
+            break;
+        case castResult::No:
+            cl.error(msg);
+            break;
+    }
+}
+
 
 void AstAnalyser::analyse(TranslationUnit& unit){
     unit.accept(*this);
@@ -63,9 +78,7 @@ void AstAnalyser::visit(VarDecl& node){
 
     if(node.init){
         node.init->accept(*this);
-        if(!typesImplicible(node.type.get(), curType)){
-            cl.error("Types is not implicible");
-        }
+        checkTypes(node.type.get(), curType, "Incompatible types in initialization");
     }
 
     curScope->names.emplace(node.name, di);
@@ -87,18 +100,22 @@ void AstAnalyser::visit(StructDecl& node){
 
 
 void AstAnalyser::visit(FuncDecl& node){
-    funcInfo fi;
-    auto savedRetType = retType;
-    retType = node.returnType.get();
-
-    for(auto& p: node.params){
-        fi.argsType.emplace_back(p->type.get());
-    }
-
     if(curScope->names.find(node.name) != curScope->names.end()){
         cl.error("Func was declarated");
         return;
     }
+
+    auto ft = std::make_unique<FuncType>();
+    ft->returnType = node.returnType->clone();
+
+    for(auto& p: node.params){
+        ft->params.push_back(p->type.get()->clone());
+    }
+
+    funcInfo fi{ft.get()};
+    funcTypes.push_back(std::move(ft));
+
+    
     curScope->names.emplace(node.name, DeclInfo(fi));
 
     auto funcScope = new Scope;
@@ -108,7 +125,11 @@ void AstAnalyser::visit(FuncDecl& node){
     for(auto& p : node.params)
         curScope->names.emplace(p->name, DeclInfo{varInfo{p->type.get(), true}});
 
+    auto savedRetType = retType;
+    retType = node.returnType.get();
+
     node.body->accept(*this);
+
     curScope = funcScope->parent;
     retType = savedRetType;
     delete funcScope;
@@ -171,12 +192,11 @@ void AstAnalyser::visit(ForStmt& node){
 void AstAnalyser::visit(ReturnStmt& node){
     if(retType == nullptr){
         cl.error("Func not returning anything");
+        return;
     }
     if(node.value) node.value->accept(*this);
     else curType = &voidType;
-    if(!typesImplicible(retType, curType)){
-        cl.error("Return type and expr not implicible");
-    }
+    checkTypes(retType, curType, "Return type mismatch");
 }
 
 
@@ -205,9 +225,8 @@ void AstAnalyser::visit(BinaryExpr& node){
     node.right->accept(*this);
     auto rType = curType;
 
-    if(!typesImplicible(lType, rType)){
-        cl.error("Types are not implicible");
-    }
+    checkTypes(lType, rType, "Incompatible types in binary expression");
+
 
     switch(node.op){
         case BinaryOp::Less:
@@ -242,8 +261,17 @@ void AstAnalyser::visit(UnaryExpr& node){
         case UnaryOp::Not:
             curType = &intType;
             break;
-        case UnaryOp::AddressOf:
-            // TODO pointer problem
+        case UnaryOp::AddressOf:{
+            if(curType == nullptr){
+                cl.error("Cannot take address of unknown type");
+                break;
+            }
+            auto pt = std::make_unique<PointerType>();
+            pt->base = curType->clone();
+            curType = pt.get();
+            ptrTypes.push_back(std::move(pt));
+            break;
+        }
             break;
         case UnaryOp::Deref:
         if(auto pt = dynamic_cast<PointerType*>(curType)){
@@ -270,9 +298,7 @@ void AstAnalyser::visit(CallExpr& node){
         else{
             for(std::size_t i = 0; i < node.param.size(); ++i){
                 node.param[i]->accept(*this);
-                if(!typesImplicible(curType, fType->params[i].get())){
-                    cl.error("Type not implicible");
-                }
+                checkTypes(fType->params[i].get(), curType, "Incompatible argument type");
 
             }
             curType = fType->returnType.get();
@@ -303,12 +329,22 @@ void AstAnalyser::visit(AccessExpr& node){
     switch(node.kind){
         case(AccessKind::Dot):{
             auto typeName = dynamic_cast<BuiltinType*>(curType)->name;
-            auto it = curScope->names.find(typeName);
-            if(it == curScope->names.end()){
+            Scope *found = nullptr;
+            
+            for(Scope* s = curScope; s; s = s->parent){
+                auto it = s->names.find(typeName);
+                if(it != s->names.end()){
+                    found = s;
+                    break;
+                }
+            }
+
+            if(!found){
                 cl.error("Type not found");
                 break;
             }
-            auto si = std::get_if<strctInfo>(&it->second.info);
+
+            auto si = std::get_if<strctInfo>(&found->names.find(typeName)->second.info);
             if(si == nullptr){
                 cl.error("Not a structure");
                 break;
@@ -364,8 +400,10 @@ void AstAnalyser::visit(CharLiteral& node){
 }
 
 void AstAnalyser::visit(StringLiteral& node){
-    curType = &pointType;
-    pointType.base = std::make_unique<BuiltinType>(BuiltinTypes::Char);
+    auto pt = std::make_unique<PointerType>();
+    pt->base = charType.clone();
+    curType = pt.get();
+    ptrTypes.push_back(std::move(pt));
 }
 
 
@@ -376,12 +414,12 @@ void AstAnalyser::visit(Identifier& node){
         if(auto v = std::get_if<varInfo>(&it->second.info)){
             curType = v->varType;
             if(!v->inited){
-                /* TODO Logger*/;
+                cl.error("Var is not inited");
             }
             return;
         }
         if(auto f = std::get_if<funcInfo>(&it->second.info)){
-            curType = f->retType; // TODO FuncType;
+            curType = f->funcType; // TODO FuncType;
             return;
         }
           
@@ -398,5 +436,13 @@ void AstAnalyser::visit(BuiltinType& node){
 
 
 void AstAnalyser::visit(PointerType& node){
+
+}
+
+void AstAnalyser::visit(FuncType&  node){
+
+}
+
+void AstAnalyser::visit(ArrayType& node){
 
 }

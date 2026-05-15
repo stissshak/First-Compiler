@@ -26,3 +26,5 @@ void StringLiteral::accept(AstVisitor& v)   { v.visit(*this); }
 void Identifier::accept(AstVisitor& v)      { v.visit(*this); }
 void BuiltinType::accept(AstVisitor& v)     { v.visit(*this); }
 void PointerType::accept(AstVisitor& v)     { v.visit(*this); }
+void ArrayType::accept(AstVisitor& v)     { v.visit(*this); }
+void FuncType::accept(AstVisitor& v)     { v.visit(*this); }

@@ -48,6 +48,8 @@ private:
     void visit(Identifier&)      override;
     void visit(BuiltinType&)     override;
     void visit(PointerType&)     override;
+    void visit(ArrayType&)       override;
+    void visit(FuncType&)        override;
 
     int depth = 0;
     bool lastChild = true;

@@ -37,16 +37,19 @@ private:
 	
 	// expressions
 	std::unique_ptr<Expr> parseExpr();
-	std::unique_ptr<Expr> parseBinary(int minPrec=0);
+	std::unique_ptr<Expr> parseBinary(int minPrior=0);
 	std::unique_ptr<Expr> parseUnary();
 	std::unique_ptr<Expr> parsePostfix();
 	std::unique_ptr<Expr> parsePrimary();
 	
 	// types
+	bool isType(Token t);
 	std::unique_ptr<Type> parseType();
 
 	// data
     const std::vector<Token>& raw;
     std::size_t pos;
     std::size_t len;
+
+	std::vector<std::string_view> names;
 };

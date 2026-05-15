@@ -19,7 +19,9 @@ struct Node{
 struct Decl : Node {};
 struct Stmt : Node {};
 struct Expr : Node {};
-struct Type : Node {};
+struct Type : Node {
+	virtual std::unique_ptr<Type> clone() const = 0;
+};
 
 // Target
 struct TranslationUnit : Node{
@@ -214,12 +216,22 @@ struct BuiltinType : Type{
 	BuiltinType(BuiltinTypes bt) : type(bt) {}
 	BuiltinType(BuiltinTypes bt, std::string_view name) : type(bt), name(name) {}
 
+	std::unique_ptr<Type> clone() const override{
+        return std::make_unique<BuiltinType>(type, name);
+    }
+
 	ACCEPT
 };
 
 struct PointerType : Type{
 	std::unique_ptr<Type> base;
 	PointerType(std::unique_ptr<Type> b = nullptr) : base(std::move(b)) {}
+
+	std::unique_ptr<Type> clone() const override{
+        auto p = std::make_unique<PointerType>();
+        p->base = base->clone();
+        return p;
+    }
 
 	ACCEPT
 };
@@ -228,14 +240,17 @@ struct ArrayType : Type{
 	std::unique_ptr<Type> elemType;
 	std::size_t size;
 
-	// ACCEPT
+	ACCEPT
 };
 
 struct FuncType : Type{
 	std::unique_ptr<Type> returnType;
     std::vector<std::unique_ptr<Type>> params;
 
-	// ACCEPT
+	std::unique_ptr<Type> clone() const override{
+		return nullptr;
+	}
+	ACCEPT
 };
 
 

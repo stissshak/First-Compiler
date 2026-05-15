@@ -11,11 +11,13 @@
 struct DeclInfo;
 struct Scope;
 
-class AstAnalyser : public AstVisitor {
+class AstAnalyser : public AstVisitor{
 public:
     void analyse(TranslationUnit& unit);
 
 private:
+    void checkTypes(Type* a, Type* b, std::string_view msg);
+
     void visit(TranslationUnit&) override;
     void visit(VarDecl&)         override;
     void visit(StructDecl&)      override;
@@ -41,6 +43,8 @@ private:
     void visit(Identifier&)      override;
     void visit(BuiltinType&)     override;
     void visit(PointerType&)     override;
+    void visit(ArrayType&)       override;
+    void visit(FuncType&)        override;
 
     Scope *curScope = nullptr;
     Type *curType = nullptr, *retType = nullptr;
@@ -53,8 +57,10 @@ private:
     BuiltinType floatType{BuiltinTypes::Float, ""};
     BuiltinType charType{BuiltinTypes::Char, ""};
     BuiltinType voidType{BuiltinTypes::Void, ""};
-    BuiltinType customType{BuiltinTypes::Custom, ""};
-    PointerType pointType{nullptr};
+    PointerType pointType;
+
+    std::vector<std::unique_ptr<FuncType>> funcTypes;
+    std::vector<std::unique_ptr<PointerType>> ptrTypes;
 };
 
 

@@ -16,12 +16,13 @@ int main(int argc, char *argv[]){
     if(argc < 2) return 1;
     string name = argv[1];
     string s = p.include_files(name);
-    cout << "File to compile:" << std::endl;
-    cout << s << std::endl;
+    //cout << "File to compile:" << std::endl;
+    //cout << s << std::endl;
     auto arrTokens = Lexer(s).tokenize();
     auto tu = Parser(arrTokens).parse();
-    cout << "AST:" << std::endl;
+    //cout << "AST:" << std::endl;
     AstPrinter().print(*tu);
+
     AstAnalyser().analyse(*tu);
 }
 
