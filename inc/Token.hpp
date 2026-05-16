@@ -21,18 +21,22 @@ enum class TokenKind{
     Perc,       // %
     PlusAssign, // +=
     MinusAssign,// -=
+    StarAssign, // *=
     SlashAssign,// /=
     PercAssign, // %=
     
-    Excl,       // !
-    Tilda,      // ~
-    LessLess,   // <<
-    GreatGreat, // >>
-    Amper,      // &
-    Pipe,       // |
-    Carret,     // ^
-    AmperAssign,// &=
-    PipeAssign, // |=
+    Excl,               // !
+    Tilda,              // ~
+    LessLess,           // <<
+    GreatGreat,         // >>
+    Amper,              // &
+    Pipe,               // |
+    Carret,             // ^
+    CarretAssign,       // ^=
+    AmperAssign,        // &=
+    PipeAssign,         // |=
+    LessLessAssign,     // <<=
+    GreatGreatAssign,   // >>=
 
     AmperAmper,     // &&
     PipePipe,       // ||
@@ -57,12 +61,20 @@ enum class TokenKind{
     LBracket,   // [
     RBracket,   // ]
 
+    Do,
+    Sizeof,
+    Typedef,
+    Const,
+    Static,
+    Union,
+    Enum,
     If,
     Else,
     For,
     While,
     Switch,
     Case,
+    Default,
     Return,
     Break,
     Continue,
@@ -75,14 +87,16 @@ enum class TokenKind{
     VoidK,
     
 
-    Hash,       // #
     Invalid,
     Eof
 };
 
+
+
 struct Token{ 
     TokenKind kind;         // Type of token
     std::string_view data;  // Place of token and size from input
+    std::size_t offset;           // Place in code
 };
 
 

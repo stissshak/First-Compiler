@@ -61,8 +61,7 @@ Token Lexer::extract_str(){
 Token Lexer::extract_char(){
     std::size_t start = pos;
     take();
-    
-    char c = take();
+    take();
 
     if(peek() != '\'') return Token{TokenKind::Invalid, raw.substr(start, pos - start)};
     take();

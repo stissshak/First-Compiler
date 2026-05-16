@@ -201,6 +201,7 @@ void AstAnalyser::visit(ReturnStmt& node){
 
 
 void AstAnalyser::visit(BreakStmt& node){
+    (void)node;
     if(!isInLoop){
         cl.error("Break statement not at loop");
     }
@@ -208,6 +209,7 @@ void AstAnalyser::visit(BreakStmt& node){
 
 
 void AstAnalyser::visit(ContinueStmt& node){
+    (void)node;
     if(!isInLoop){
         cl.error("Continue statement not at loop");
     }
@@ -387,19 +389,23 @@ void AstAnalyser::visit(AccessExpr& node){
 
 
 void AstAnalyser::visit(IntLiteral& node){
+    (void)node;
     curType = &intType;
 }
 
 
 void AstAnalyser::visit(FloatLiteral& node){
+    (void)node;
     curType = &floatType;
 }
 
 void AstAnalyser::visit(CharLiteral& node){
+    (void)node;
     curType = &charType;
 }
 
 void AstAnalyser::visit(StringLiteral& node){
+    (void)node;
     auto pt = std::make_unique<PointerType>();
     pt->base = charType.clone();
     curType = pt.get();
@@ -419,30 +425,30 @@ void AstAnalyser::visit(Identifier& node){
             return;
         }
         if(auto f = std::get_if<funcInfo>(&it->second.info)){
-            curType = f->funcType; // TODO FuncType;
+            curType = f->funcType;
             return;
         }
           
-        // TODO Logger
+        cl.error("Identifier is not a var or func");
         return;
       }
-    // TODO Logger
+    cl.error("Identifier not found");
 }
 
 
 void AstAnalyser::visit(BuiltinType& node){
-
+    (void)node;
 }
 
 
 void AstAnalyser::visit(PointerType& node){
-
+    (void)node;
 }
 
 void AstAnalyser::visit(FuncType&  node){
-
+    (void)node;
 }
 
 void AstAnalyser::visit(ArrayType& node){
-
+    (void)node;
 }

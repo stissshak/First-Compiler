@@ -10,5 +10,6 @@ private:
 public:
     void load_file(const std::string &path);
     const std::string &get_buffer() const { return buffer; };
-    std::string &steal_buffer() { return buffer;};
+    std::string &mutable_buffer() { return buffer;};
+    std::string file_name;
 };
