@@ -4,6 +4,8 @@
 
 #include <iostream>
 #include <string>
+#include <unordered_set>
+#include <filesystem>
 
 #include "Input.hpp"
 
@@ -25,7 +27,7 @@ public:
             std::size_t pos = content.find("#include \"", last_pos);
             if(pos == std::string::npos) break;
 
-            if(!at_last_start(content, pos)){
+            if(!at_line_start(content, pos)){
                 search_from = pos + 1;
                 continue;
             }
@@ -58,5 +60,6 @@ private:
         }
         return true;
     }
+
     std::unordered_set<std::string> included;
 };
