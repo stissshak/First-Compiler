@@ -250,11 +250,15 @@ void AstPrinter::visit(ForStmt& node) {
     printIndent(false);
     std::cout << "Init\n";
     enter(false);
-    if (node.init) {
+    if (node.initDecl) {
         printIndent(true); enter(true);
-        node.init->accept(*this);
+        node.initDecl->accept(*this);
         leave();
-    } else {
+    } else if(node.initStmt){
+        printIndent(true); enter(true);
+        node.initStmt->accept(*this);
+        leave();
+    }else{
         printIndent(true);
         std::cout << "(empty)\n";
     }
@@ -360,6 +364,18 @@ void AstPrinter::visit(CallExpr& node) {
         }
         leave();
     }
+}
+
+void AstPrinter::visit(CastExpr& node) {
+    std::cout << "CaseExpr\n";
+
+    printIndent(true);
+    std::cout << "From\n";
+    node.target->accept(*this);
+    printIndent(true);
+    std::cout << "To\n";
+    node.expr->accept(*this);
+    leave(); leave();
 }
 
 void AstPrinter::visit(IndexExpr& node) {

@@ -17,7 +17,7 @@ private:
     const Token& peek(std::size_t shift=0) const;
     const Token& take();
 	bool match(TokenKind kind);
-	void except(TokenKind kind);
+	void expect(TokenKind kind);
 
 	// declarations
 	std::unique_ptr<Decl> parseDecl();
@@ -43,7 +43,8 @@ private:
 	std::unique_ptr<Expr> parsePrimary();
 	
 	// types
-	bool isType(Token t);
+	bool isType(const Token& t);
+	std::unique_ptr<Type> parseBaseType();
 	std::unique_ptr<Type> parseType();
 
 	// data
@@ -51,5 +52,5 @@ private:
     std::size_t pos;
     std::size_t len;
 
-	std::vector<std::string_view> names;
+	std::vector<std::string_view> userTypes;
 };

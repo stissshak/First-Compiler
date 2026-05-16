@@ -17,6 +17,7 @@ void ContinueStmt::accept(AstVisitor& v)    { v.visit(*this); }
 void BinaryExpr::accept(AstVisitor& v)      { v.visit(*this); }
 void UnaryExpr::accept(AstVisitor& v)       { v.visit(*this); }
 void CallExpr::accept(AstVisitor& v)        { v.visit(*this); }
+void CastExpr::accept(AstVisitor& v)        { v.visit(*this); }
 void IndexExpr::accept(AstVisitor& v)       { v.visit(*this); }
 void AccessExpr::accept(AstVisitor& v)      { v.visit(*this); }
 void IntLiteral::accept(AstVisitor& v)      { v.visit(*this); }

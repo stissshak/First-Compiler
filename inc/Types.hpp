@@ -29,32 +29,43 @@ inline int typeIndex(Type* t){
 			case BuiltinTypes::Char:   return 2;
 			case BuiltinTypes::Void:   return 3;
 			case BuiltinTypes::Custom: return 4;
+            default: return -1;
         }
     }
     if(dynamic_cast<PointerType*>(t)) return 5;
     return -1;
 }
 
-inline castResult checkCast(Type* a, Type* b){
-    int ai = typeIndex(a);
-    int bi = typeIndex(b);
+inline bool isVoidPtr(const PointerType* pointer){
+    return dynamic_cast<BuiltinType*>(pointer->base.get())->type == BuiltinTypes::Void;
+}
+
+inline castResult checkCast( Type* from, Type* to){
+    int fromi = typeIndex(from);
+    int toi = typeIndex(to);
     
-    if(ai == -1 || bi == -1){
+    if(fromi == -1 || toi == -1){
         // TODO Logger: unknown type
         return castResult::No;
     }
 
     // Two types are custom
-    if(ai == 4 && bi == 4){
-        auto ab = static_cast<BuiltinType*>(a);
-        auto bb = static_cast<BuiltinType*>(b);
-        return ab->name == bb->name ? castResult::Equal : castResult::No;
+    if(fromi == 4 && toi == 4){
+        auto fromb = static_cast<BuiltinType*>(from);
+        auto tob = static_cast<BuiltinType*>(to);
+        return fromb->name == tob->name ? castResult::Equal : castResult::No;
+    }
+    if(fromi == 5 && toi == 5){
+        auto fromp = static_cast<PointerType*>(from);
+        auto top = static_cast<PointerType*>(to);
+        if(isVoidPtr(fromp) || isVoidPtr(top)) return castResult::Implicit;
+        return checkCast(fromp->base.get(), top->base.get());
     }
 
-    return castMatrix[ai][bi];
+    return castMatrix[fromi][toi];
 }
 
-inline bool typesImplicible(Type* a, Type* b){
+inline bool canImplicitCast(Type* a, Type* b){
     switch(checkCast(a, b)){
         case castResult::Equal:
         case castResult::Implicit:

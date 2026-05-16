@@ -12,10 +12,6 @@
 
 ConsoleLogger cl;
 
-enum class DeclType{
-    Var, Func, Struct
-};
-
 struct varInfo{
     Type* varType;
     bool inited;
@@ -37,10 +33,11 @@ struct DeclInfo{
 
 struct Scope{
     Scope *parent;
-    std::unordered_map<std::string_view, DeclInfo> names;
+    std::unordered_map<std::string_view, DeclInfo> symbols;
 };
 
 void AstAnalyser::checkTypes(Type* a, Type* b, std::string_view msg){
+    if (!a || !b) return;
     switch (checkCast(a, b)) {
         case castResult::Equal:
         case castResult::Implicit:
@@ -71,7 +68,7 @@ void AstAnalyser::visit(TranslationUnit& node){
 void AstAnalyser::visit(VarDecl& node){
     DeclInfo di = {varInfo{node.type.get(), node.init != nullptr}};
 
-    if(curScope->names.find(node.name) != curScope->names.end()){
+    if(curScope->symbols.find(node.name) != curScope->symbols.end()){
         cl.error("Var was declarated");
         return;
     }
@@ -81,7 +78,7 @@ void AstAnalyser::visit(VarDecl& node){
         checkTypes(node.type.get(), curType, "Incompatible types in initialization");
     }
 
-    curScope->names.emplace(node.name, di);
+    curScope->symbols.emplace(node.name, di);
 }
 
 void AstAnalyser::visit(StructDecl& node){
@@ -91,16 +88,16 @@ void AstAnalyser::visit(StructDecl& node){
        si.fields.emplace_back(f->name, DeclInfo{varInfo{f->type.get(), f->init != nullptr }});
     }
 
-    if(curScope->names.find(node.name) != curScope->names.end()){
+    if(curScope->symbols.find(node.name) != curScope->symbols.end()){
         cl.error("Struct was declarated");
         return;
     }
-    curScope->names.emplace(node.name, DeclInfo(si));
+    curScope->symbols.emplace(node.name, DeclInfo(si));
 }
 
 
 void AstAnalyser::visit(FuncDecl& node){
-    if(curScope->names.find(node.name) != curScope->names.end()){
+    if(curScope->symbols.find(node.name) != curScope->symbols.end()){
         cl.error("Func was declarated");
         return;
     }
@@ -116,14 +113,14 @@ void AstAnalyser::visit(FuncDecl& node){
     funcTypes.push_back(std::move(ft));
 
     
-    curScope->names.emplace(node.name, DeclInfo(fi));
+    curScope->symbols.emplace(node.name, DeclInfo(fi));
 
     auto funcScope = new Scope;
     funcScope->parent = curScope;
     curScope = funcScope;
 
     for(auto& p : node.params)
-        curScope->names.emplace(p->name, DeclInfo{varInfo{p->type.get(), true}});
+        curScope->symbols.emplace(p->name, DeclInfo{varInfo{p->type.get(), true}});
 
     auto savedRetType = retType;
     retType = node.returnType.get();
@@ -178,7 +175,8 @@ void AstAnalyser::visit(ForStmt& node){
     forScope->parent = curScope;
     curScope = forScope;
 
-    if(node.init != nullptr) node.init->accept(*this);
+    if(node.initDecl != nullptr) node.initDecl->accept(*this);
+    else if(node.initStmt != nullptr) node.initStmt->accept(*this);
     if(node.cond != nullptr) node.cond->accept(*this);
     if(node.incr != nullptr) node.incr->accept(*this);
     node.body->accept(*this);
@@ -222,6 +220,18 @@ void AstAnalyser::visit(DeclStmt& node){
 
 
 void AstAnalyser::visit(BinaryExpr& node){
+    if(node.op == BinaryOp::Assign) {
+        if(auto id = dynamic_cast<Identifier*>(node.left.get())){
+            for(Scope* s = curScope; s; s = s->parent){
+                auto it = s->symbols.find(id->name);
+                if(it != s->symbols.end()){
+                    if (auto v = std::get_if<varInfo>(&it->second.info)) v->inited = true;
+                    break;
+                }
+            }
+        }
+    }
+
     node.left->accept(*this);
     auto lType = curType;
     node.right->accept(*this);
@@ -274,7 +284,6 @@ void AstAnalyser::visit(UnaryExpr& node){
             ptrTypes.push_back(std::move(pt));
             break;
         }
-            break;
         case UnaryOp::Deref:
         if(auto pt = dynamic_cast<PointerType*>(curType)){
             curType = pt->base.get();
@@ -291,7 +300,9 @@ void AstAnalyser::visit(CallExpr& node){
     node.func->accept(*this);
     auto fType = dynamic_cast<FuncType*>(curType);
     if(fType == nullptr){
-        // TODO Logger
+        cl.error("Called object is not a function");
+        curType = nullptr;
+        return;
     }
     else{
         if(node.param.size() != fType->params.size()){
@@ -308,6 +319,10 @@ void AstAnalyser::visit(CallExpr& node){
     }
 }
 
+void AstAnalyser::visit(CastExpr& node){
+    node.expr->accept(*this);
+    checkTypes(node.target.get(), curType, "Incompatible cast types");
+}
 
 void AstAnalyser::visit(IndexExpr& node){
     node.index->accept(*this);
@@ -319,72 +334,60 @@ void AstAnalyser::visit(IndexExpr& node){
     if(auto at = dynamic_cast<ArrayType*>(curType)){
         curType = at->elemType.get();
     }
+    else if(auto pt = dynamic_cast<PointerType*>(curType)) curType = pt->base.get();
+
     else{
         cl.error("Not Array");
     }
 
 }
 
+strctInfo* lookupStruct(std::string_view name, Scope* curScope){
+    for (Scope* s = curScope; s; s = s->parent){
+        auto it = s->symbols.find(name);
+        if (it == s->symbols.end()) continue;
+        return std::get_if<strctInfo>(&it->second.info);
+    }
+    return nullptr;
+}
+
 // TODO all scopes
 void AstAnalyser::visit(AccessExpr& node){
     node.object->accept(*this);
-    switch(node.kind){
-        case(AccessKind::Dot):{
-            auto typeName = dynamic_cast<BuiltinType*>(curType)->name;
-            Scope *found = nullptr;
-            
-            for(Scope* s = curScope; s; s = s->parent){
-                auto it = s->names.find(typeName);
-                if(it != s->names.end()){
-                    found = s;
-                    break;
-                }
-            }
 
-            if(!found){
-                cl.error("Type not found");
-                break;
-            }
-
-            auto si = std::get_if<strctInfo>(&found->names.find(typeName)->second.info);
-            if(si == nullptr){
-                cl.error("Not a structure");
-                break;
-            }
-            for(auto& f : si->fields){
-                if(f.first == node.field){
-                    curType = std::get<varInfo>(f.second.info).varType;
-                    return;
-                }
-            }
-            cl.error("Struct not found");
-            break;
+    BuiltinType* bt = nullptr;
+    if(node.kind == AccessKind::Dot){
+        bt = dynamic_cast<BuiltinType*>(curType);
+        if(!bt || bt->type != BuiltinTypes::Custom){
+            cl.error("Member access on non-struct type");
+            return;
         }
-        case(AccessKind::Arrow):{
-            auto typeName = static_cast<BuiltinType*>(dynamic_cast<PointerType*>(curType)->base.get())->name;
-            auto it = curScope->names.find(typeName);
-            if(it == curScope->names.end()){
-                cl.error("Type not found");
-                break;
-            }
-            auto si = std::get_if<strctInfo>(&it->second.info);
-            if(si == nullptr){
-                cl.error("Not a structure");
-                break;
-            }
-            for(auto& f : si->fields){
-                if(f.first == node.field){
-                    curType = std::get<varInfo>(f.second.info).varType;
-                    return;
-                }
-            }
-            cl.error("Struct not found");
-            break;
+    }else{
+        auto pt = dynamic_cast<PointerType*>(curType);
+        if(!pt){
+            cl.error("Arrow on non-pointer");
+            return;
         }
-        default:
-            // Logger
-            break;
+        bt = dynamic_cast<BuiltinType*>(pt->base.get());
+        if(!bt || bt->type != BuiltinTypes::Custom){
+            cl.error("Member access on non-struct type");
+            return;
+        }
     }
+
+    auto si = lookupStruct(bt->name, curScope);
+    if(!si){
+        cl.error("Struct type not found");
+        return;
+    }
+
+    for(auto& f: si->fields){
+        if(f.first == node.field){
+            curType = std::get<varInfo>(f.second.info).varType;
+            return;
+        }
+    }
+    cl.error("Field not found in struct");
 }
 
 
@@ -415,8 +418,8 @@ void AstAnalyser::visit(StringLiteral& node){
 
 void AstAnalyser::visit(Identifier& node){
     for(Scope* s = curScope; s; s = s->parent){
-        auto it = s->names.find(node.name);
-        if(it == s->names.end()) continue;
+        auto it = s->symbols.find(node.name);
+        if(it == s->symbols.end()) continue;
         if(auto v = std::get_if<varInfo>(&it->second.info)){
             curType = v->varType;
             if(!v->inited){
@@ -429,8 +432,7 @@ void AstAnalyser::visit(Identifier& node){
             return;
         }
           
-        cl.error("Identifier is not a var or func");
-        return;
+        continue;
       }
     cl.error("Identifier not found");
 }

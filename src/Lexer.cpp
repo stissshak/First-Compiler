@@ -20,6 +20,26 @@ char Lexer::take(){
     return raw[pos++];
 }
 
+void Lexer::skip(){
+    while(!is_end()){
+        if(std::isspace((unsigned char)peek())){
+            ++pos;
+            continue;
+        }
+        if(peek() == '/' && pos+1 < len && raw[pos+1] == '/'){
+            while(!is_end() && peek() != '\n') ++pos;
+            continue;
+        }
+        if(peek() == '/' && pos+1 < len && raw[pos+1] == '*'){
+            pos += 2;
+            while(!is_end() && !(peek() == '*' && pos+1 < len && raw[pos+1] == '/')) ++pos;
+            if(!is_end()) pos += 2;
+            continue;
+        }
+        break;
+    }
+}
+
 std::vector<Token> Lexer::tokenize(){
     std::vector<Token> res;
     while(!is_end()){
@@ -29,9 +49,22 @@ std::vector<Token> Lexer::tokenize(){
 }
 
 Token Lexer::extract(){
+    if(peek() == '/' && pos + 1 < len){
+        if(raw[pos+1] == '/'){
+            while(!is_end() && peek() != '\n') ++pos;
+            return extract();
+        }
+        if(raw[pos+1] == '*'){
+            pos += 2;
+            while(!is_end() && !(peek() == '*' && pos+1 < len && raw[pos+1] == '/')) ++pos;
+            if(!is_end()) pos += 2;
+            return extract();
+        }
+    }
+
     while(!is_end() && std::isspace(static_cast<unsigned char>(peek()))) ++pos;
     if(is_end()){
-        return Token{TokenKind::Eof, {}};
+        return Token{TokenKind::Eof, {}, pos};
     }
     if(peek() == '"') return extract_str();
     if(peek() == '\'') return extract_char();
@@ -52,35 +85,43 @@ Token Lexer::extract_str(){
         else take();
     }
 
-    if(is_end()) return Token{TokenKind::Invalid, raw.substr(start, pos - start)};
+    if(is_end()) return Token{TokenKind::Invalid, raw.substr(start, pos - start), start};
     take();
     std::string_view str = raw.substr(start, pos - start);
-    return Token{TokenKind::String, str};
+    return Token{TokenKind::String, str, start};
 }
 
 Token Lexer::extract_char(){
     std::size_t start = pos;
     take();
-    take();
+    if(is_end()) return Token{TokenKind::Invalid, raw.substr(start, pos - start), start};
+    if(peek() == '\\'){
+        take();
+        if(!is_end()) take();
+    }else{
+        take();
+    }
 
-    if(peek() != '\'') return Token{TokenKind::Invalid, raw.substr(start, pos - start)};
+
+    if(peek() != '\'') return Token{TokenKind::Invalid, raw.substr(start, pos - start), start};
     take();
-    return Token{TokenKind::Char, raw.substr(start, pos - start)};
+    return Token{TokenKind::Char, raw.substr(start, pos - start), start};
 }
 
 Token Lexer::extract_op(){
+    std::size_t start = pos;
     auto two = raw.substr(pos, 2);
     if(auto it = ops.find(two); it != ops.end()){
         pos += 2;
-        return Token{it->second, two};
+        return Token{it->second, two, start};
     }
     auto one = raw.substr(pos, 1);
     if(auto it = ops.find(one); it != ops.end()){
         pos += 1;
-        return Token{it->second, one};
+        return Token{it->second, one, start};
     }
     take();
-    return Token{TokenKind::Invalid, {}};
+    return Token{TokenKind::Invalid, {}, start};
 }
 
 Token Lexer::extract_num(){
@@ -99,7 +140,7 @@ Token Lexer::extract_num(){
     }
 
     std::string_view num = raw.substr(start, pos - start);
-    return dot ? Token{TokenKind::Float, num} : Token{TokenKind::Int, num};
+    return dot ? Token{TokenKind::Float, num, start} : Token{TokenKind::Int, num, start};
 }
 
 Token Lexer::extract_word(){
@@ -112,8 +153,8 @@ Token Lexer::extract_word(){
     std::string_view word = raw.substr(start, pos - start);
 
     if(auto it = keys.find(word); it != keys.end()){
-        return Token{it->second, word};
+        return Token{it->second, word, start};
     }
 
-    return Token{TokenKind::Identifier, word};
+    return Token{TokenKind::Identifier, word, start};
 }

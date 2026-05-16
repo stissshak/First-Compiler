@@ -90,7 +90,8 @@ struct WhileStmt : Stmt{
 };
 
 struct ForStmt : Stmt{
-	std::unique_ptr<Node> init; // Variant<Expr, Decl>
+	std::unique_ptr<Decl> initDecl;
+	std::unique_ptr<Stmt> initStmt;
 	std::unique_ptr<Expr> cond;
 	std::unique_ptr<Expr> incr;
 	std::unique_ptr<Stmt> body;
@@ -240,6 +241,13 @@ struct ArrayType : Type{
 	std::unique_ptr<Type> elemType;
 	std::size_t size;
 
+	std::unique_ptr<Type> clone() const override{
+		auto a = std::make_unique<ArrayType>();
+		a->elemType = elemType->clone();
+		a->size = size;
+		return a;
+	}
+
 	ACCEPT
 };
 
@@ -248,7 +256,10 @@ struct FuncType : Type{
     std::vector<std::unique_ptr<Type>> params;
 
 	std::unique_ptr<Type> clone() const override{
-		return nullptr;
+		auto f = std::make_unique<FuncType>();
+		f->returnType = returnType->clone();
+		for (auto& p : params) f->params.push_back(p->clone());
+		return f;
 	}
 	ACCEPT
 };

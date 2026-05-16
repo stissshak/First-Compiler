@@ -39,6 +39,7 @@ private:
     void visit(BinaryExpr&)      override;
     void visit(UnaryExpr&)       override;
     void visit(CallExpr&)        override;
+    void visit(CastExpr&)        override;
     void visit(IndexExpr&)       override;
     void visit(AccessExpr&)      override;
     void visit(IntLiteral&)      override;

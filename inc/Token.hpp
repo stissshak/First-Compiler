@@ -61,25 +61,29 @@ enum class TokenKind{
     LBracket,   // [
     RBracket,   // ]
 
-    Do,
+
     Sizeof,
     Typedef,
     Const,
     Static,
-    Union,
-    Enum,
+    Return,
+
     If,
     Else,
+
     For,
     While,
+    Do,
+
     Switch,
     Case,
     Default,
-    Return,
     Break,
     Continue,
 
     Struct,
+    Union,
+    Enum,
 
     IntK,
     FloatK,
@@ -96,7 +100,7 @@ enum class TokenKind{
 struct Token{ 
     TokenKind kind;         // Type of token
     std::string_view data;  // Place of token and size from input
-    std::size_t offset;           // Place in code
+    std::size_t offset = 0; // Place in code
 };
 
 
