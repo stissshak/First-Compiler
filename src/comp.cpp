@@ -25,17 +25,10 @@ int main(int argc, char *argv[]){
 }
 
 
-// CLI - argv
-// Source
-// Frontend - Lexer/Parser/Analyzer
-// Backend - IR/Codegen
-// Compiler
-
-// var declaraion
 // typedef
-// cast
 // IR
-// analyser - type
 // unsigned(?)
-// 
 
+
+// Assign expr from binary type
+// Array Type

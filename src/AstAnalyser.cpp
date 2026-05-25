@@ -7,8 +7,6 @@
 #include "AstAnalyser.hpp"
 #include "Logger.hpp"
 
-// TODO 
-// StringLiteral/FuncType - MakeType
 
 ConsoleLogger cl;
 
@@ -66,12 +64,12 @@ void AstAnalyser::visit(TranslationUnit& node){
     delete curScope;
 }
 void AstAnalyser::visit(VarDecl& node){
-    DeclInfo di = {varInfo{node.type.get(), node.init != nullptr}};
-
     if(curScope->symbols.find(node.name) != curScope->symbols.end()){
         cl.error("Var was declarated");
         return;
     }
+
+    DeclInfo di = {varInfo{node.type.get(), node.init != nullptr}};
 
     if(node.init){
         node.init->accept(*this);
@@ -82,20 +80,20 @@ void AstAnalyser::visit(VarDecl& node){
 }
 
 void AstAnalyser::visit(StructDecl& node){
+    if(curScope->symbols.find(node.name) != curScope->symbols.end()){
+        cl.error("Struct was declarated");
+        return;
+    }
+
     strctInfo si;
 
     for(auto& f : node.fields){
        si.fields.emplace_back(f->name, DeclInfo{varInfo{f->type.get(), f->init != nullptr }});
     }
-
-    if(curScope->symbols.find(node.name) != curScope->symbols.end()){
-        cl.error("Struct was declarated");
-        return;
-    }
     curScope->symbols.emplace(node.name, DeclInfo(si));
 }
 
-
+// TODO split 2 for
 void AstAnalyser::visit(FuncDecl& node){
     if(curScope->symbols.find(node.name) != curScope->symbols.end()){
         cl.error("Func was declarated");
@@ -119,6 +117,7 @@ void AstAnalyser::visit(FuncDecl& node){
     funcScope->parent = curScope;
     curScope = funcScope;
 
+    // TODO param names
     for(auto& p : node.params)
         curScope->symbols.emplace(p->name, DeclInfo{varInfo{p->type.get(), true}});
 
@@ -151,6 +150,7 @@ void AstAnalyser::visit(ExprStmt& node){
     node.expr->accept(*this);
 }
 
+// TODO cond -> bool
 
 void AstAnalyser::visit(IfStmt& node){
     node.cond->accept(*this);
@@ -188,26 +188,20 @@ void AstAnalyser::visit(ForStmt& node){
 
 
 void AstAnalyser::visit(ReturnStmt& node){
-    if(retType == nullptr){
-        cl.error("Func not returning anything");
-        return;
-    }
     if(node.value) node.value->accept(*this);
     else curType = &voidType;
     checkTypes(retType, curType, "Return type mismatch");
 }
 
 
-void AstAnalyser::visit(BreakStmt& node){
-    (void)node;
+void AstAnalyser::visit(BreakStmt&){
     if(!isInLoop){
         cl.error("Break statement not at loop");
     }
 }
 
 
-void AstAnalyser::visit(ContinueStmt& node){
-    (void)node;
+void AstAnalyser::visit(ContinueStmt&){
     if(!isInLoop){
         cl.error("Continue statement not at loop");
     }
@@ -218,9 +212,9 @@ void AstAnalyser::visit(DeclStmt& node){
     node.decl->accept(*this);
 }
 
-
+// Change assign, from binary to other AST node
 void AstAnalyser::visit(BinaryExpr& node){
-    if(node.op == BinaryOp::Assign) {
+    /*if(node.op == BinaryOp::Assign) {
         if(auto id = dynamic_cast<Identifier*>(node.left.get())){
             for(Scope* s = curScope; s; s = s->parent){
                 auto it = s->symbols.find(id->name);
@@ -231,6 +225,7 @@ void AstAnalyser::visit(BinaryExpr& node){
             }
         }
     }
+        */
 
     node.left->accept(*this);
     auto lType = curType;
@@ -252,13 +247,15 @@ void AstAnalyser::visit(BinaryExpr& node){
             curType = &intType;
             break;
         default:
+        // TODO common type
             curType = lType;
             break;
     }
 
 }
 
-
+// TODO portfix + assign check
+// TODO weakptr
 void AstAnalyser::visit(UnaryExpr& node){
     node.child->accept(*this);
 
@@ -285,6 +282,7 @@ void AstAnalyser::visit(UnaryExpr& node){
             break;
         }
         case UnaryOp::Deref:
+        // TODO void pointer deref
         if(auto pt = dynamic_cast<PointerType*>(curType)){
             curType = pt->base.get();
         } else {
@@ -322,12 +320,13 @@ void AstAnalyser::visit(CallExpr& node){
 void AstAnalyser::visit(CastExpr& node){
     node.expr->accept(*this);
     checkTypes(node.target.get(), curType, "Incompatible cast types");
+    curType = node.target.get();
 }
 
 void AstAnalyser::visit(IndexExpr& node){
     node.index->accept(*this);
     if(curType != &intType){
-        cl.error("Must be integer");
+        cl.error("Must be integer in Array");
     }
 
     node.arr->accept(*this);
@@ -335,7 +334,6 @@ void AstAnalyser::visit(IndexExpr& node){
         curType = at->elemType.get();
     }
     else if(auto pt = dynamic_cast<PointerType*>(curType)) curType = pt->base.get();
-
     else{
         cl.error("Not Array");
     }
@@ -351,7 +349,6 @@ strctInfo* lookupStruct(std::string_view name, Scope* curScope){
     return nullptr;
 }
 
-// TODO all scopes
 void AstAnalyser::visit(AccessExpr& node){
     node.object->accept(*this);
 

@@ -11,6 +11,8 @@ enum class castResult{
 	No
 };
 
+// TODO nullptr_t 
+
 inline const castResult castMatrix[6][6] = {
 //	int		float	char	void	custom	ptr
 /* int */	{castResult::Equal, castResult::Implicit, castResult::Implicit, castResult::No, castResult::No, castResult::Warn},
@@ -74,8 +76,6 @@ inline bool canImplicitCast(Type* a, Type* b){
             // TODO Logger
             return true;
         case castResult::No:
-            return false;
-        default:
             return false;
     }
 }

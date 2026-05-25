@@ -108,6 +108,8 @@ Token Lexer::extract_char(){
     return Token{TokenKind::Char, raw.substr(start, pos - start), start};
 }
 
+
+// TODO 3 char
 Token Lexer::extract_op(){
     std::size_t start = pos;
     auto two = raw.substr(pos, 2);
@@ -143,6 +145,8 @@ Token Lexer::extract_num(){
     return dot ? Token{TokenKind::Float, num, start} : Token{TokenKind::Int, num, start};
 }
 
+
+// TODO unexepted char and word at start
 Token Lexer::extract_word(){
     std::size_t start = pos;
     

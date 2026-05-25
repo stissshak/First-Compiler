@@ -166,7 +166,6 @@ std::unique_ptr<Decl> Parser::parseStruct(){
 		if(!match(TokenKind::Semicolon)) break; 
 	}
 	expect(TokenKind::RBlock);
-	expect(TokenKind::Semicolon);
 
 	auto stct = std::make_unique<StructDecl>();
 	stct->name = name;
@@ -299,12 +298,12 @@ std::unique_ptr<Stmt> Parser::parseFor(){
 	std::unique_ptr<Decl> initDecl;
     std::unique_ptr<Stmt> initStmt;
 
-	if(!match(TokenKind::Semicolon)) {
-	} else {
-		if(isType(peek()))
-			initDecl = parseVarDecl();
-		else
-			initStmt = parseExprStmt();
+	if(peek().kind == TokenKind::Semicolon){
+		take();
+	} else if(isType(peek())){
+		initDecl = parseVarDecl();
+	} else{
+		initStmt = parseExprStmt();
 	}
 
 	std::unique_ptr<Expr> cond = nullptr;

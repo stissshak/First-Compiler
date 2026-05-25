@@ -77,7 +77,7 @@ struct DeclStmt : Stmt{
 struct IfStmt : Stmt{
 	std::unique_ptr<Expr> cond;
 	std::unique_ptr<Stmt> thenPart;
-	std::unique_ptr<Stmt> elsePart;
+	std::unique_ptr<Stmt> elsePart; // optional
 
 	ACCEPT
 };
@@ -90,8 +90,8 @@ struct WhileStmt : Stmt{
 };
 
 struct ForStmt : Stmt{
-	std::unique_ptr<Decl> initDecl;
-	std::unique_ptr<Stmt> initStmt;
+	std::unique_ptr<Decl> initDecl; // optional
+	std::unique_ptr<Stmt> initStmt; // optional
 	std::unique_ptr<Expr> cond;
 	std::unique_ptr<Expr> incr;
 	std::unique_ptr<Stmt> body;
@@ -237,6 +237,8 @@ struct PointerType : Type{
 	ACCEPT
 };
 
+
+// TODO size_t -> expr
 struct ArrayType : Type{
 	std::unique_ptr<Type> elemType;
 	std::size_t size;

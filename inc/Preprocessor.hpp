@@ -68,7 +68,7 @@ private:
     std::size_t count_newlines(const std::string& s, std::size_t end){
         std::size_t n = 0;
         for(std::size_t i = 0; i < end && i < s.size(); ++i){
-            if(s[i] == 'n') ++n;
+            if(s[i] == '\n') ++n;
         }
         return n;
     }

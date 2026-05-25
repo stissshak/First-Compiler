@@ -36,6 +36,7 @@ public:
                 ++col;
             }
         }
+        return SourceLoc{it->file_name, line, col};
     }
 private:
     std::vector<SourceFragment> fragments;
