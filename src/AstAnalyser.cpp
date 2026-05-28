@@ -18,7 +18,7 @@ struct varInfo{
 
 struct funcInfo{
     FuncType* funcType;
-
+    bool isDefined;
 };
 
 struct strctInfo{
@@ -93,10 +93,38 @@ void AstAnalyser::visit(StructDecl& node){
     curScope->symbols.emplace(node.name, DeclInfo(si));
 }
 
+void AstAnalyser::analyseFuncBody(FuncDecl& node){
+      auto funcScope = new Scope;
+      funcScope->parent = curScope;
+      curScope = funcScope;
+
+      for(auto& p : node.params)                                                                                                                         
+          curScope->symbols.emplace(p->name, DeclInfo{varInfo{p->type.get(), true}});
+
+      auto savedRetType = retType;
+      retType = node.returnType.get();
+  
+      node.body->accept(*this);
+
+      curScope = funcScope->parent;
+      retType = savedRetType;
+      delete funcScope;
+}
+
+
 // TODO split 2 for
 void AstAnalyser::visit(FuncDecl& node){
-    if(curScope->symbols.find(node.name) != curScope->symbols.end()){
-        cl.error("Func was declarated");
+    auto f = curScope->symbols.find(node.name);
+    if(f != curScope->symbols.end()){
+        auto existing = std::get_if<funcInfo>(&f->second.info);
+        if(!existing || existing->isDefined){
+            cl.error("Func was declarated");
+            return;
+        }
+        if(node.body){
+            existing->isDefined = true;
+            analyseFuncBody(node);
+        }
         return;
     }
 
@@ -111,24 +139,18 @@ void AstAnalyser::visit(FuncDecl& node){
     funcTypes.push_back(std::move(ft));
 
     
+    
+
+    if(!node.body){
+        fi.isDefined = false;
+        curScope->symbols.emplace(node.name, DeclInfo(fi));
+        return;
+    }
+
+    fi.isDefined = true;
     curScope->symbols.emplace(node.name, DeclInfo(fi));
 
-    auto funcScope = new Scope;
-    funcScope->parent = curScope;
-    curScope = funcScope;
-
-    // TODO param names
-    for(auto& p : node.params)
-        curScope->symbols.emplace(p->name, DeclInfo{varInfo{p->type.get(), true}});
-
-    auto savedRetType = retType;
-    retType = node.returnType.get();
-
-    node.body->accept(*this);
-
-    curScope = funcScope->parent;
-    retType = savedRetType;
-    delete funcScope;
+    analyseFuncBody(node);
 }
 
 

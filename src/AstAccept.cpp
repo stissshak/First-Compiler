@@ -1,6 +1,8 @@
 #include "Ast.hpp"
 #include "AstVisitor.hpp"
 
+#define ACCEPT(nodeName) void nodeName::accept(AstVisitor& v) { v.visit(*this); }
+
 void TranslationUnit::accept(AstVisitor& v) { v.visit(*this); }
 void VarDecl::accept(AstVisitor& v)         { v.visit(*this); }
 void StructDecl::accept(AstVisitor& v)      { v.visit(*this); }

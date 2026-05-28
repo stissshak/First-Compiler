@@ -4,11 +4,16 @@
 
 #include <string>
 #include <vector>
+#include <unordered_map>
 #include <filesystem>
 #include <fstream>
 
 #include "AstVisitor.hpp"
 #include "Ast.hpp"
+
+struct VarInfo;
+struct StackVarInfo;
+struct FuncInfo;
 
 class CodeGenerator : public AstVisitor{
 public:
@@ -48,7 +53,9 @@ private:
     void visit(ArrayType&)       override;
     void visit(FuncType&)        override;
 
-    bool inFunc = false;
+    FuncType* fType = nullptr;
+
+    std::unordered_map<std::string_view, FuncDecl*> funcs;
 
     std::ofstream output;
     std::ofstream textOut, dataOut, bssOut, rodataOut;

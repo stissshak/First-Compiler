@@ -191,13 +191,17 @@ std::unique_ptr<Decl> Parser::parseFunction(){
 	}
 	expect(TokenKind::RPar);
 
-	auto body = parseBlock();
 
 	auto func = std::make_unique<FuncDecl>();
 	func->returnType = std::move(type);
 	func->name = name;
 	func->params = std::move(args);
-	func->body = std::move(body);
+
+	if(match(TokenKind::Semicolon)){
+		func->body = nullptr;
+	}else{
+		func->body = parseStmt();
+	}
 	return func;
 }
 

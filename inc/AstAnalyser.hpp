@@ -17,6 +17,7 @@ public:
 
 private:
     void checkTypes(Type* a, Type* b, std::string_view msg);
+    void analyseFuncBody(FuncDecl& node);
 
     void visit(TranslationUnit&) override;
     void visit(VarDecl&)         override;

@@ -2,37 +2,35 @@
 
 #include "CodeGenerator.hpp"
 
-enum sections{
-    bss,
-    data,
-    rodata,
-    text
-};
-
+enum class Section : uint8_t {Bss, Data, Rodata, Text};
+enum class Storage : uint8_t {Global, Stack, Register};
 
 
 struct VarInfo{
     std::string_view name;
-    sections location;
-    unsigned char size;
+    uint32_t size = 0;
+    uint32_t align = 0;
+    Storage  storage = Storage::Stack;
+    union{
+        Section section;
+        uint32_t rbp;
+        int reg;
+    };
 };
 
-struct StackVarInfo{
+struct LocalVarInfo{
     std::size_t offset;
-    unsigned char size;
+    uint32_t size, align;
 };
 
+// Func -> array var
 
+struct FuncInfo{
+      std::vector<VarInfo> vars;
+      std::string instructions;
+      uint32_t frameSize = 0;
+  };
 
-
-
-std::string typeToString(Type *t){
-
-}
-
-std::string typeBssToString(Type *t){
-
-}
 
 
 void CodeGenerator::generate(TranslationUnit& unit){
@@ -46,16 +44,8 @@ void CodeGenerator::visit(TranslationUnit& node){
 }
 
 void CodeGenerator::visit(VarDecl& node){
-    if(inFunc){
-        
-    }
-    else{
-        if(node.init != nullptr){
-            dataOut << node.name << typeToString(node.type.get()) /*+ init*/ << "\n" ;
-        }
-        else{
-            bssOut << node.name << typeBssToString(node.type.get()) << "\n";
-        }
+    if(fType){
+
     }
 }
 
@@ -79,7 +69,6 @@ void CodeGenerator::visit(IfStmt& node){
 }
 
 void CodeGenerator::visit(WhileStmt& node){
-    output << "";
 
 }
 
