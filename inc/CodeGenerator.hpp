@@ -7,13 +7,40 @@
 #include <unordered_map>
 #include <filesystem>
 #include <fstream>
+#include <cstdint>
 
 #include "AstVisitor.hpp"
 #include "Ast.hpp"
 
-struct VarInfo;
-struct StackVarInfo;
-struct FuncInfo;
+enum class Section : uint8_t{Bss, Data, Rodata, Text};
+enum class Storage : uint8_t{Global, Stack, Register};
+
+enum class Reg : uint8_t{
+    rax, rbx, rcx, rdx, rsi, rdi, rsp, rbp,
+    r8, r9, r10, r11, r12, r13, r14, r15
+};
+
+
+struct VarInfo{
+    std::string_view name;
+    uint32_t size = 0;
+    uint32_t align = 0;
+    Storage  storage = Storage::Stack;
+    union{
+        Section section;
+        int32_t rbpOffset;
+        int reg;
+    };
+};
+
+struct FuncInfo{
+    std::vector<VarInfo> vars;
+    std::string body;
+    uint32_t frameSize = 0;
+    bool hasCall = false;
+    std::vector<Reg> freeRegs;
+    std::vector<Reg> inUse;
+};
 
 class CodeGenerator : public AstVisitor{
 public:
@@ -24,6 +51,8 @@ public:
 
     void generate(TranslationUnit& unit);
 private:
+    void emitFunction(FuncDecl&);
+
     void visit(TranslationUnit&) override;
     void visit(VarDecl&)         override;
     void visit(StructDecl&)      override;
@@ -53,12 +82,12 @@ private:
     void visit(ArrayType&)       override;
     void visit(FuncType&)        override;
 
-    FuncType* fType = nullptr;
+    FuncInfo current;
 
     std::unordered_map<std::string_view, FuncDecl*> funcs;
 
     std::ofstream output;
-    std::ofstream textOut, dataOut, bssOut, rodataOut;
+    std::string textBuf, dataBuf, bssBuf, rodataBuf;
     // Hashmap: 
 };
 

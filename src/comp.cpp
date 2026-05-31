@@ -7,6 +7,7 @@
 #include "Parser.hpp"
 #include "AstPrinter.hpp"
 #include "AstAnalyser.hpp"
+#include "CodeGenerator.hpp"
 
 
 int main(int argc, char *argv[]){
@@ -22,6 +23,8 @@ int main(int argc, char *argv[]){
     AstPrinter().print(*tu);
 
     AstAnalyser().analyse(*tu);
+
+    CodeGenerator(argv[2]).generate(*tu);
 }
 
 

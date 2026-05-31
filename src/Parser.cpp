@@ -196,12 +196,8 @@ std::unique_ptr<Decl> Parser::parseFunction(){
 	func->returnType = std::move(type);
 	func->name = name;
 	func->params = std::move(args);
-
-	if(match(TokenKind::Semicolon)){
-		func->body = nullptr;
-	}else{
-		func->body = parseStmt();
-	}
+	if(match(TokenKind::Semicolon)) func->body = nullptr;
+	else func->body = parseBlock();
 	return func;
 }
 
