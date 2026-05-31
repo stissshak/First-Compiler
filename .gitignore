@@ -1,5 +1,7 @@
 *.h
 *.c
+*.s
+*.txt
 .vscode/
 tmp/
 obj/

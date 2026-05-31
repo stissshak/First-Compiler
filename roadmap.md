@@ -67,3 +67,33 @@
   - [ ] Implicit conversions
   - [ ] lvalue/rvalue
 - [ ] Diagnostics with source locations
+
+## Backend (Code generation)
+Target: x86-64, NASM syntax (`nasm -f elf64`), SysV ABI.
+- [ ] Functions
+  - [x] prologue / epilogue (push rbp, mov rbp rsp, leave, ret)
+  - [x] frame layout + 16-byte aligned `sub rsp`
+  - [x] parameter passing (6 regs + stack args, spilled to frame)
+  - [x] single epilogue label (`.Lreturn_<fn>`)
+- [ ] Expressions
+  - [ ] literals (int) + identifier loads
+  - [ ] arithmetic (add, sub, imul)
+  - [ ] div / mod (rax:rdx, cqo, idiv)
+  - [ ] comparisons (cmp / setcc / movzx)
+  - [ ] logical && / || (short-circuit)
+  - [ ] assignment (=, +=) + initializer stores
+  - [ ] function calls (arg setup, caller-saved spills, alignment fixup)
+- [ ] Statements
+  - [ ] return
+  - [ ] if / while / for (branches + labels)
+  - [ ] break / continue
+- [ ] Register allocator
+  - [x] free / in-use register pools (acquire / release)
+  - [ ] spill to stack when pool exhausted
+- [ ] Globals + data sections (.data / .rodata / .bss)
+- [ ] Floating point (xmm registers)
+- [ ] Structs / arrays / pointers in codegen
+
+## IR & optimization (future)
+- [ ] Intermediate representation
+- [ ] -O0 / -O1 / -O2 passes
