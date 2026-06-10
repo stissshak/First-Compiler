@@ -45,6 +45,7 @@ std::vector<Token> Lexer::tokenize(){
     while(!is_end()){
         res.push_back(extract());
     }
+    res.push_back(Token{TokenKind::Eof, {}, pos});   
     return res;
 }
 
@@ -109,9 +110,13 @@ Token Lexer::extract_char(){
 }
 
 
-// TODO 3 char
 Token Lexer::extract_op(){
     std::size_t start = pos;
+    auto three = raw.substr(pos, 3);
+    if(auto it = ops.find(three); it != ops.end()){
+        pos += 3;
+        return Token{it->second, three, start};
+    }
     auto two = raw.substr(pos, 2);
     if(auto it = ops.find(two); it != ops.end()){
         pos += 2;

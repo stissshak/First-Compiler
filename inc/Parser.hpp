@@ -7,10 +7,12 @@
 
 #include "Token.hpp"
 #include "Ast.hpp"
+#include "SourceMap.hpp"
 
 class Parser{
 public:
-    Parser(const std::vector<Token>& raw) : raw(raw), pos(0), len(raw.size()) {}
+    Parser(const std::vector<Token>& raw, const SourceMap& smap, const std::string& buffer)
+        : raw(raw), pos(0), len(raw.size()), smap(smap), buffer(buffer) {}
     std::unique_ptr<TranslationUnit> parse();
 private:
     bool isEnd() const;
@@ -18,6 +20,7 @@ private:
     const Token& take();
 	bool match(TokenKind kind);
 	void expect(TokenKind kind);
+	[[noreturn]] void fail(const std::string& msg) const;
 
 	// declarations
 	std::unique_ptr<Decl> parseDecl();
@@ -51,6 +54,8 @@ private:
     const std::vector<Token>& raw;
     std::size_t pos;
     std::size_t len;
+    const SourceMap& smap;
+    const std::string& buffer;
 
 	std::vector<std::string_view> userTypes;
 };

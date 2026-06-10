@@ -7,16 +7,21 @@
 
 #include "AstVisitor.hpp"
 #include "Ast.hpp"
+#include "SourceMap.hpp"
 
 struct DeclInfo;
 struct Scope;
 
 class AstAnalyser : public AstVisitor{
 public:
+    AstAnalyser(const SourceMap& smap, const std::string& buffer)
+        : smap(smap), buffer(buffer) {}
     void analyse(TranslationUnit& unit);
 
 private:
-    void checkTypes(Type* a, Type* b, std::string_view msg);
+    void err(const Node& n, std::string_view msg);
+    void warn(const Node& n, std::string_view msg);
+    void checkTypes(Type* a, Type* b, const Node& n, std::string_view msg);
     void analyseFuncBody(FuncDecl& node);
 
     void visit(TranslationUnit&) override;
@@ -41,6 +46,7 @@ private:
     void visit(IntLiteral&)      override;
     void visit(FloatLiteral&)    override;
     void visit(CharLiteral&)     override;
+    void visit(BoolLiteral&)     override;
     void visit(StringLiteral&)   override;
     void visit(Identifier&)      override;
     void visit(BuiltinType&)     override;
@@ -51,6 +57,8 @@ private:
     Scope *curScope = nullptr;
     Type *curType = nullptr, *retType = nullptr;
     bool isInLoop = false;
+    const SourceMap& smap;
+    const std::string& buffer;
     
     // func type
     // curnt type
@@ -58,6 +66,7 @@ private:
     BuiltinType intType{BuiltinTypes::Int, ""};
     BuiltinType floatType{BuiltinTypes::Float, ""};
     BuiltinType charType{BuiltinTypes::Char, ""};
+    BuiltinType boolType{BuiltinTypes::Bool, ""};
     BuiltinType voidType{BuiltinTypes::Void, ""};
     PointerType pointType;
 

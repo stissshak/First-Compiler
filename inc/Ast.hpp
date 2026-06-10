@@ -12,13 +12,20 @@ struct AstVisitor;
 #define ACCEPT void accept(AstVisitor& v) override;
 
 struct Node{
+	std::size_t offset = 0;
+
 	virtual ~Node() = default;
 	virtual void accept(AstVisitor& v) = 0;
 };
 
+struct Type;
+
 struct Decl : Node {};
 struct Stmt : Node {};
-struct Expr : Node {};
+struct Expr : Node {
+	std::unique_ptr<Type> resultType;   
+};
+
 struct Type : Node {
 	virtual std::unique_ptr<Type> clone() const = 0;
 };
@@ -44,7 +51,8 @@ struct FuncDecl : Decl{
 	std::string_view name;
 	std::vector<std::unique_ptr<VarDecl>> params;
 	std::unique_ptr<Stmt> body;
-	
+	bool variadic = false;
+
 	ACCEPT
 };
 
@@ -118,8 +126,10 @@ enum class BinaryOp{
 	Less, Greater, Equal, NotEqual,
 	LessEqual, GreaterEqual,
 	And, Or,
-	Assign,	AddAssign, MinusAssign 
-
+	BitAnd, BitOr, BitXor,
+	Shl, Shr, 
+	Assign,	AddAssign, MinusAssign, MulAssign, DivAssign, ModAssign,
+	BitAndAssign, BitOrAssign, BitXorAssign, ShlAssign, ShrAssign
 };
 
 struct BinaryExpr : Expr{
@@ -134,6 +144,7 @@ enum class UnaryOp{
 	Pos, Neg, Not, AddressOf, Deref,
 	PreInc, PreDec,
 	PostInc, PostDec,
+	BitNot,
 };
 
 struct UnaryExpr : Expr{
@@ -198,6 +209,12 @@ struct StringLiteral : Expr{
 	ACCEPT
 };
 
+struct BoolLiteral : Expr{
+	bool value;
+
+	ACCEPT
+};
+
 struct Identifier : Expr{
 	std::string_view name;
 
@@ -208,7 +225,7 @@ struct Identifier : Expr{
 
 
 enum class BuiltinTypes{
-	Int, Float, Char, Void, Custom
+	Int, Float, Char, Void, Custom, Bool
 };
 
 struct BuiltinType : Type{
@@ -256,11 +273,13 @@ struct ArrayType : Type{
 struct FuncType : Type{
 	std::unique_ptr<Type> returnType;
     std::vector<std::unique_ptr<Type>> params;
+	bool variadic = false;
 
 	std::unique_ptr<Type> clone() const override{
 		auto f = std::make_unique<FuncType>();
 		f->returnType = returnType->clone();
 		for (auto& p : params) f->params.push_back(p->clone());
+		f->variadic = variadic;
 		return f;
 	}
 	ACCEPT

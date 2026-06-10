@@ -11,6 +11,8 @@ enum class TokenKind{
     Char,
     Identifier,
     String,
+    True,
+    False,
 
     Plus,       // +
     PlusPlus,   // ++
@@ -50,6 +52,7 @@ enum class TokenKind{
     Assign,     // =
     Comma,      // ,
     Dot,        // .
+    Ellipsis,   // ...
     Arrow,      // ->
     Question,   // ?
     Colon,      // :
@@ -87,6 +90,7 @@ enum class TokenKind{
 
     IntK,
     FloatK,
+    BoolK,
     CharK,
     VoidK,
     

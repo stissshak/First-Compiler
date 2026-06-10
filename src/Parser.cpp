@@ -52,9 +52,13 @@ bool Parser::match(TokenKind type){
 	return false;
 }
 
+void Parser::fail(const std::string& msg) const{
+	throw std::runtime_error(smap.where(peek().offset, buffer) + ": " + msg);
+}
+
 void Parser::expect(TokenKind kind){
 	if(peek().kind != kind){
-		throw std::runtime_error("Unexpected token");
+		fail("Unexpected token");
 	}
 	take();
 }
@@ -79,6 +83,7 @@ bool Parser::isType(const Token& t){
 		case TokenKind::FloatK:
 		case TokenKind::CharK:
 		case TokenKind::VoidK:
+		case TokenKind::BoolK:
 			return true;
 		case TokenKind::Identifier:
 			if(std::find(userTypes.begin(), userTypes.end(), t.data) == userTypes.end()){
@@ -104,9 +109,13 @@ std::unique_ptr<Type> Parser::parseBaseType() {
 		case TokenKind::VoidK:
 			take();
 			return std::make_unique<BuiltinType>(BuiltinTypes::Void);
+		case TokenKind::BoolK:
+			take();
+			return std::make_unique<BuiltinType>(BuiltinTypes::Bool);
+		
 		default:
 			if (peek().kind != TokenKind::Identifier)
-        		throw std::runtime_error("Expected type name");
+        		fail("Expected type name");
 
 			auto t = take();
             return std::make_unique<BuiltinType>(BuiltinTypes::Custom , t.data);
@@ -134,21 +143,22 @@ std::unique_ptr<Decl> Parser::parseDecl(){
 	if(isType(peek())){
 		int i = 1;
 		while(!isEnd() && peek(i).kind == TokenKind::Star) ++i;
-		if(peek(i).kind != TokenKind::Identifier) throw std::runtime_error("Expected identifier");
+		if(peek(i).kind != TokenKind::Identifier) fail("Expected identifier");
 		if(peek(i+1).kind == TokenKind::LPar) return parseFunction();
 		return parseVarDecl();
 	}
-	throw std::runtime_error("Expected declaration");
+	fail("Expected declaration");
 }
 
 
 std::unique_ptr<VarDecl> Parser::parseParam(){
     auto type = parseType();
     
-	if(peek().kind != TokenKind::Identifier) throw std::runtime_error("Exepted identifier");
+	if(peek().kind != TokenKind::Identifier) fail("Exepted identifier");
 	auto name = take();
 
     auto var = std::make_unique<VarDecl>();
+    var->offset = name.offset;
     var->type = std::move(type);
     var->name = name.data;
     return var;
@@ -157,8 +167,9 @@ std::unique_ptr<VarDecl> Parser::parseParam(){
 
 std::unique_ptr<Decl> Parser::parseStruct(){
 	if(peek().kind != TokenKind::Identifier)
-    	throw std::runtime_error("Expected identifier");
-	auto name = take().data;
+    	fail("Expected identifier");
+	auto& nameTok = take();
+	auto name = nameTok.data;
 	expect(TokenKind::LBlock);
 	auto fields = std::vector<std::unique_ptr<VarDecl>>();
 	while(!isEnd() && peek().kind != TokenKind::RBlock){
@@ -168,6 +179,7 @@ std::unique_ptr<Decl> Parser::parseStruct(){
 	expect(TokenKind::RBlock);
 
 	auto stct = std::make_unique<StructDecl>();
+	stct->offset = nameTok.offset;
 	stct->name = name;
 	stct->fields = std::move(fields);
 	userTypes.push_back(name);
@@ -179,23 +191,28 @@ std::unique_ptr<Decl> Parser::parseFunction(){
 	auto type = parseType();
 
 	if(peek().kind != TokenKind::Identifier)
-    	throw std::runtime_error("Expected identifier");
-	auto name = take().data;
-	
+    	fail("Expected identifier");
+	auto& nameTok = take();
+	auto name = nameTok.data;
+
 	expect(TokenKind::LPar);
 	auto args = std::vector<std::unique_ptr<VarDecl>>();
-	
+	bool variadic = false;
+
 	while(!isEnd() && peek().kind != TokenKind::RPar){
+		if(match(TokenKind::Ellipsis)){ variadic = true; break; } // must be last
 		args.push_back(parseParam());
-		if(!match(TokenKind::Comma)) break; 
+		if(!match(TokenKind::Comma)) break;
 	}
 	expect(TokenKind::RPar);
 
 
 	auto func = std::make_unique<FuncDecl>();
+	func->offset = nameTok.offset;
 	func->returnType = std::move(type);
 	func->name = name;
 	func->params = std::move(args);
+	func->variadic = variadic;
 	if(match(TokenKind::Semicolon)) func->body = nullptr;
 	else func->body = parseBlock();
 	return func;
@@ -204,9 +221,19 @@ std::unique_ptr<Decl> Parser::parseFunction(){
 std::unique_ptr<Decl> Parser::parseVarDecl(){
 	auto type = parseType();
 
-	if (peek().kind != TokenKind::Identifier) throw std::runtime_error("Expected type name");
+	if (peek().kind != TokenKind::Identifier) fail("Expected type name");
 
 	auto name = take();
+
+	// TODO multi-dim, size as expr
+	if(match(TokenKind::LBracket)){
+		if(peek().kind != TokenKind::Int) fail("Expected array size");
+		auto arr = std::make_unique<ArrayType>();
+		arr->size = svtoi(take().data);
+		arr->elemType = std::move(type);
+		type = std::move(arr);
+		expect(TokenKind::RBracket);
+	}
 
 	std::unique_ptr<Expr> expr = nullptr;
 	if(match(TokenKind::Assign))
@@ -214,6 +241,7 @@ std::unique_ptr<Decl> Parser::parseVarDecl(){
 
 	expect(TokenKind::Semicolon);
 	auto var = std::make_unique<VarDecl>();
+	var->offset = name.offset;
 	var->type = std::move(type);
 	var->name = name.data;
 	var->init = std::move(expr);
@@ -224,22 +252,26 @@ std::unique_ptr<Decl> Parser::parseVarDecl(){
 // statments
 
 std::unique_ptr<Stmt> Parser::parseStmt(){
+	std::size_t off = peek().offset;
+	std::unique_ptr<Stmt> s;
 	switch(peek().kind){
-		case TokenKind::If: return parseIf();
-		case TokenKind::While: return parseWhile();
-		case TokenKind::For: return parseFor();
-		case TokenKind::LBlock: return parseBlock();
-		case TokenKind::Return:   return parseReturn();
-        case TokenKind::Break:    { take(); expect(TokenKind::Semicolon); return std::make_unique<BreakStmt>(); }
-        case TokenKind::Continue: { take(); expect(TokenKind::Semicolon); return std::make_unique<ContinueStmt>(); }
-		default: 
+		case TokenKind::If: s = parseIf(); break;
+		case TokenKind::While: s = parseWhile(); break;
+		case TokenKind::For: s = parseFor(); break;
+		case TokenKind::LBlock: s = parseBlock(); break;
+		case TokenKind::Return:   s = parseReturn(); break;
+        case TokenKind::Break:    { take(); expect(TokenKind::Semicolon); s = std::make_unique<BreakStmt>(); break; }
+        case TokenKind::Continue: { take(); expect(TokenKind::Semicolon); s = std::make_unique<ContinueStmt>(); break; }
+		default:
 			if(isType(peek())){
 				auto ds = std::make_unique<DeclStmt>();
                 ds->decl = parseVarDecl();
-                return ds;
+                s = std::move(ds);
 			}
-			return parseExprStmt();
+			else s = parseExprStmt();
 	}
+	s->offset = off;
+	return s;
 }
 
 std::unique_ptr<Stmt> Parser::parseBlock(){
@@ -361,7 +393,10 @@ struct OpInfo{
 			case TokenKind::Assign:      // =
 			case TokenKind::PlusAssign:  // +=
 			case TokenKind::MinusAssign: // -=
-				prec = 0; rightAcc = true;
+			case TokenKind::StarAssign: case TokenKind::SlashAssign: case TokenKind::PercAssign:
+			case TokenKind::AmperAssign: case TokenKind::PipeAssign: case TokenKind::CarretAssign:
+			case TokenKind::LessLessAssign: case TokenKind::GreatGreatAssign:
+			prec = 0; rightAcc = true;
 				break;       
 			case TokenKind::PipePipe:          // ||
 				prec = 1; rightAcc = false;
@@ -369,21 +404,35 @@ struct OpInfo{
 			case TokenKind::AmperAmper:         // &&
 				prec = 2; rightAcc = false;
 				break;
+			case TokenKind::Pipe:
+				prec = 3; rightAcc = false;
+				break;
+			case TokenKind::Carret:
+				prec = 4; rightAcc = false;
+				break;
+			case TokenKind::Amper:
+				prec = 5; rightAcc = false;
+				break;
 			case TokenKind::AssignAssign:
 			case TokenKind::ExclAssign:
-				prec = 3; rightAcc = false; break;
+				prec = 6; rightAcc = false;
+				break;
 			case TokenKind::Less:
 			case TokenKind::Great:
 			case TokenKind::LessAssign:
 			case TokenKind::GreatAssign:
-				prec = 4; rightAcc = false; break;
+				prec = 7; rightAcc = false;
+				break;
+			case TokenKind::LessLess: case TokenKind::GreatGreat:
+                prec = 8; rightAcc = false;
+				break;
 			case TokenKind::Plus:
 			case TokenKind::Minus:
-				prec = 5; rightAcc = false; break;
+				prec = 9; rightAcc = false; break;
 			case TokenKind::Star:
 			case TokenKind::Slash:
 			case TokenKind::Perc:
-				prec = 6; rightAcc = false; break;
+				prec = 10; rightAcc = false; break;
 			default:
 				prec = -1; rightAcc = false;
 				break;
@@ -410,6 +459,19 @@ BinaryOp tokenToBinOp(const Token& tok) {
 		case TokenKind::GreatAssign: return BinaryOp::GreaterEqual;
 		case TokenKind::AmperAmper: return BinaryOp::And;
 		case TokenKind::PipePipe: return BinaryOp::Or;
+		case TokenKind::StarAssign: return BinaryOp::MulAssign;
+		case TokenKind::SlashAssign: return BinaryOp::DivAssign;
+		case TokenKind::PercAssign: return BinaryOp::ModAssign;
+		case TokenKind::Amper: return BinaryOp::BitAnd;
+		case TokenKind::Pipe: return BinaryOp::BitOr;
+		case TokenKind::Carret: return BinaryOp::BitXor;
+		case TokenKind::LessLess: return BinaryOp::Shl;
+		case TokenKind::GreatGreat: return BinaryOp::Shr;
+		case TokenKind::AmperAssign: return BinaryOp::BitAndAssign;
+		case TokenKind::PipeAssign: return BinaryOp::BitOrAssign;
+		case TokenKind::CarretAssign: return BinaryOp::BitXorAssign;
+		case TokenKind::LessLessAssign: return BinaryOp::ShlAssign;
+		case TokenKind::GreatGreatAssign: return BinaryOp::ShrAssign;
 		default: throw std::runtime_error("Unexpected binary operator");
 	}
 }
@@ -431,6 +493,7 @@ std::unique_ptr<Expr> Parser::parseBinary(int minPrior){
 		auto r = parseBinary(nextMinPrec);
 
 		auto node = std::make_unique<BinaryExpr>();
+		node->offset = op.offset;
 		node->left = std::move(l);
 		node->right = std::move(r);
 		node->op = tokenToBinOp(op);
@@ -448,6 +511,7 @@ std::unique_ptr<Expr> Parser::parseUnary(){
         expect(TokenKind::RPar);
         auto inner = parseUnary();
 		auto node = std::make_unique<CastExpr>();
+		node->offset = off;
         node->target = std::move(type);
         node->expr = std::move(inner);
         return node;
@@ -460,43 +524,57 @@ std::unique_ptr<Expr> Parser::parseUnary(){
 		case TokenKind::Minus: // -
 			take();
 			node = std::make_unique<UnaryExpr>();
+			node->offset = tok.offset;
 			node->op = UnaryOp::Neg;
 			node->child = parseUnary();
 			return node;
 		case TokenKind::Plus: // +
 			take();
 			node = std::make_unique<UnaryExpr>();
+			node->offset = tok.offset;
 			node->op = UnaryOp::Pos;
 			node->child = parseUnary();
 			return node;
 		case TokenKind::Star: // *
 			take();
 			node = std::make_unique<UnaryExpr>();
+			node->offset = tok.offset;
 			node->op = UnaryOp::Deref;
 			node->child = parseUnary();
 			return node;
 		case TokenKind::Excl:   // !
 			take();
 			node = std::make_unique<UnaryExpr>();
+			node->offset = tok.offset;
 			node->op = UnaryOp::Not;
 			node->child = parseUnary();
 			return node;
 		case TokenKind::Amper:  // &
 			take();
 			node = std::make_unique<UnaryExpr>();
+			node->offset = tok.offset;
 			node->op = UnaryOp::AddressOf;
 			node->child = parseUnary();
 			return node;
 		case TokenKind::PlusPlus:   // ++
 			take();
 			node = std::make_unique<UnaryExpr>();
+			node->offset = tok.offset;
 			node->op = UnaryOp::PreInc;
 			node->child = parseUnary();
 			return node;
 		case TokenKind::MinusMinus: // --
 			take();
 			node = std::make_unique<UnaryExpr>();
+			node->offset = tok.offset;
 			node->op = UnaryOp::PreDec;
+			node->child = parseUnary();
+			return node;
+		case TokenKind::Tilda: // ~
+			take();
+			node = std::make_unique<UnaryExpr>();
+			node->offset = tok.offset;
+			node->op = UnaryOp::BitNot;
 			node->child = parseUnary();
 			return node;
 		default:
@@ -505,7 +583,9 @@ std::unique_ptr<Expr> Parser::parseUnary(){
 }
 
 std::unique_ptr<Expr> Parser::parsePostfix(){
-	auto expr = parsePrimary();	
+	std::size_t primOff = peek().offset;
+	auto expr = parsePrimary();
+	expr->offset = primOff;
 	while(true) {
         const Token &tok = peek();
 
@@ -515,6 +595,7 @@ std::unique_ptr<Expr> Parser::parsePostfix(){
                 take();
 
                 auto call = std::make_unique<CallExpr>();
+                call->offset = tok.offset;
                 call->func = std::move(expr);
 
                 if(peek().kind != TokenKind::RPar) {
@@ -534,6 +615,7 @@ std::unique_ptr<Expr> Parser::parsePostfix(){
                 take();
 
                 auto index = std::make_unique<IndexExpr>();
+                index->offset = tok.offset;
                 index->arr = std::move(expr);
                 index->index = parseExpr();
 
@@ -547,11 +629,12 @@ std::unique_ptr<Expr> Parser::parsePostfix(){
                 take();
 
                 auto access = std::make_unique<AccessExpr>();
+                access->offset = tok.offset;
                 access->object = std::move(expr);
                 access->kind = AccessKind::Dot;
 
                 if(peek().kind != TokenKind::Identifier)
-                    throw std::runtime_error("Expected field after '.'");
+                    fail("Expected field after '.'");
 
                 access->field = take().data;
 
@@ -563,11 +646,12 @@ std::unique_ptr<Expr> Parser::parsePostfix(){
                 take();
 
                 auto access = std::make_unique<AccessExpr>();
+                access->offset = tok.offset;
                 access->object = std::move(expr);
                 access->kind = AccessKind::Arrow;
 
                 if(peek().kind != TokenKind::Identifier)
-                    throw std::runtime_error("Expected field after '->'");
+                    fail("Expected field after '->'");
 
                 access->field = take().data;
 
@@ -578,6 +662,7 @@ std::unique_ptr<Expr> Parser::parsePostfix(){
     		{
 					take();
 					auto u = std::make_unique<UnaryExpr>();
+					u->offset = tok.offset;
 					u->op = UnaryOp::PostInc;
 					u->child = std::move(expr);
 					expr = std::move(u);
@@ -623,6 +708,20 @@ std::unique_ptr<Expr> Parser::parsePrimary(){
 			node->value = tok.data[1];
 			return node;
 		}
+		case TokenKind::True:
+		{
+			take();
+			auto node = std::make_unique<BoolLiteral>();
+			node->value = true;
+			return node;
+		}
+		case TokenKind::False:
+		{
+			take();
+			auto node = std::make_unique<BoolLiteral>();
+			node->value = false;
+			return node;
+		}
 		case TokenKind::String:
 		{
 			take();
@@ -645,7 +744,7 @@ std::unique_ptr<Expr> Parser::parsePrimary(){
 			return expr;
 		}
 			default:
-			throw std::runtime_error("Unexpected token");
+			fail("Unexpected token");
 	}
 }
 

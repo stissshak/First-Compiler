@@ -1,7 +1,7 @@
 #include "Ast.hpp"
 #include "AstVisitor.hpp"
 
-#define ACCEPT(nodeName) void nodeName::accept(AstVisitor& v) { v.visit(*this); }
+// #define ACCEPT(nodeName) void nodeName::accept(AstVisitor& v) { v.visit(*this); }
 
 void TranslationUnit::accept(AstVisitor& v) { v.visit(*this); }
 void VarDecl::accept(AstVisitor& v)         { v.visit(*this); }
@@ -25,6 +25,7 @@ void AccessExpr::accept(AstVisitor& v)      { v.visit(*this); }
 void IntLiteral::accept(AstVisitor& v)      { v.visit(*this); }
 void FloatLiteral::accept(AstVisitor& v)    { v.visit(*this); }
 void CharLiteral::accept(AstVisitor& v)     { v.visit(*this); }
+void BoolLiteral::accept(AstVisitor& v)     { v.visit(*this); }
 void StringLiteral::accept(AstVisitor& v)   { v.visit(*this); }
 void Identifier::accept(AstVisitor& v)      { v.visit(*this); }
 void BuiltinType::accept(AstVisitor& v)     { v.visit(*this); }

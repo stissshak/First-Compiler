@@ -21,7 +21,7 @@ struct SourceMap{
 public:
     void add(std::size_t offset, std::string file_name, std::size_t line){ fragments.push_back(SourceFragment{offset, std::move(file_name), line});}
 
-    SourceLoc resolve(std::size_t offset, const std::string& buffer){
+    SourceLoc resolve(std::size_t offset, const std::string& buffer) const{
         auto it = std::upper_bound(fragments.begin(), fragments.end(), offset, [](std::size_t o, const SourceFragment& sf) { return o < sf.buffer_offset; });
         if(it == fragments.begin()) return SourceLoc{"unknown", 1, 1};
         --it;
@@ -37,6 +37,11 @@ public:
             }
         }
         return SourceLoc{it->file_name, line, col};
+    }
+
+    std::string where(std::size_t offset, const std::string& buffer) const{
+        SourceLoc l = resolve(offset, buffer);
+        return l.file_name + ":" + std::to_string(l.line) + ":" + std::to_string(l.col);
     }
 private:
     std::vector<SourceFragment> fragments;

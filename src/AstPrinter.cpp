@@ -31,11 +31,15 @@ std::string AstPrinter::typeName(Type* type) {
             case BuiltinTypes::Float: return "float";
             case BuiltinTypes::Char:  return "char";
             case BuiltinTypes::Void:  return "void";
+            case BuiltinTypes::Bool:  return "bool";
             case BuiltinTypes::Custom: return std::string{b->name};
         }
     }
     if (auto* p = dynamic_cast<PointerType*>(type)) {
         return typeName(p->base.get()) + "*";
+    }
+    if (auto* a = dynamic_cast<ArrayType*>(type)) {
+        return typeName(a->elemType.get()) + "[" + std::to_string(a->size) + "]";
     }
     return "?";
 }
@@ -147,7 +151,7 @@ void AstPrinter::visit(FuncDecl& node) {
     {
         printIndent(true);
         enter(true);
-        node.body->accept(*this);
+        if(node.body) node.body->accept(*this);
         leave();
     }
 }
@@ -367,15 +371,12 @@ void AstPrinter::visit(CallExpr& node) {
 }
 
 void AstPrinter::visit(CastExpr& node) {
-    std::cout << "CaseExpr\n";
+    std::cout << "CastExpr -> " << typeName(node.target.get()) << "\n";
 
     printIndent(true);
-    std::cout << "From\n";
-    node.target->accept(*this);
-    printIndent(true);
-    std::cout << "To\n";
+    enter(true);
     node.expr->accept(*this);
-    leave(); leave();
+    leave();
 }
 
 void AstPrinter::visit(IndexExpr& node) {
@@ -416,6 +417,10 @@ void AstPrinter::visit(FloatLiteral& node) {
 
 void AstPrinter::visit(CharLiteral& node) {
     std::cout << "CharLiteral " << node.value << "\n";
+}
+
+void AstPrinter::visit(BoolLiteral& node) {
+    std::cout << "BoolLiteral " << node.value << "\n";
 }
 
 void AstPrinter::visit(StringLiteral& node) {

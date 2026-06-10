@@ -78,6 +78,7 @@ static const std::unordered_map<std::string_view, TokenKind> ops = {
     {"%=", TokenKind::PercAssign},
 
     {",", TokenKind::Comma},
+    {"...", TokenKind::Ellipsis},
     {".", TokenKind::Dot},
     {"?", TokenKind::Question},
     {":", TokenKind::Colon},
@@ -109,10 +110,14 @@ static const std::unordered_map<std::string_view, TokenKind> keys = {
     {"break", TokenKind::Break},
     {"continue", TokenKind::Continue},
 
+    {"true", TokenKind::True},
+    {"false", TokenKind::False},
+
     {"int", TokenKind::IntK},
     {"float", TokenKind::FloatK},
     {"char", TokenKind::CharK},
     {"void", TokenKind::VoidK},
+    {"bool", TokenKind::BoolK},
 
     {"struct", TokenKind::Struct},
     {"enum", TokenKind::Enum},

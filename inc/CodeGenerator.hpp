@@ -8,6 +8,7 @@
 #include <filesystem>
 #include <fstream>
 #include <cstdint>
+#include <algorithm>
 
 #include "AstVisitor.hpp"
 #include "Ast.hpp"
@@ -17,9 +18,21 @@ enum class Storage : uint8_t{Global, Stack, Register};
 
 enum class Reg : uint8_t{
     rax, rbx, rcx, rdx, rsi, rdi, rsp, rbp,
-    r8, r9, r10, r11, r12, r13, r14, r15
+    r8, r9, r10, r11, r12, r13, r14, r15,
+    xmm0, xmm1, xmm2, xmm3, xmm4, xmm5, xmm6, xmm7,
+    xmm8, xmm9, xmm10, xmm11, xmm12, xmm13, xmm14, xmm15,
+
 };
 
+enum class RegClass : uint8_t{ Int, Sse };
+
+inline bool isXmm(Reg r){ return (uint8_t)r >= (uint8_t)Reg::xmm0; }
+
+struct LValue{
+    std::string mem;
+    Reg reg;
+    bool ownsReg = false;
+};
 
 struct VarInfo{
     std::string_view name;
@@ -35,11 +48,14 @@ struct VarInfo{
 
 struct FuncInfo{
     std::vector<VarInfo> vars;
+    std::string name;
     std::string body;
     uint32_t frameSize = 0;
     bool hasCall = false;
     std::vector<Reg> freeRegs;
     std::vector<Reg> inUse;
+    std::vector<Reg> freeXmm;
+    std::vector<Reg> inUseXmm;
 };
 
 class CodeGenerator : public AstVisitor{
@@ -51,7 +67,22 @@ public:
 
     void generate(TranslationUnit& unit);
 private:
+    Reg resultReg = Reg::rax;
+    Reg alloc(RegClass cls = RegClass::Int);
+    void freeReg(Reg r);
+    VarInfo* findVar(std::string_view name);
+    Reg emitRValue(Expr& e);
+    LValue emitLValue(Expr& e);
+    void emitLoad(Reg dst, const std::string& mem, Type* t);
+    void emitStore(const std::string& mem, Reg src, Type* t);
+    Reg loadLValue(const LValue& lv, Type* t);
+    static std::string memOf(int32_t off){ return "[rbp" + std::to_string(off) + "]"; }
+    std::string newLabel(const std::string& tag){ return ".L" + tag + std::to_string(labelId++); }
+
+
     void emitFunction(FuncDecl&);
+    void emitLocalVar(VarDecl&);
+    Reg emitBaseAddr(Expr&);
 
     void visit(TranslationUnit&) override;
     void visit(VarDecl&)         override;
@@ -75,6 +106,7 @@ private:
     void visit(IntLiteral&)      override;
     void visit(FloatLiteral&)    override;
     void visit(CharLiteral&)     override;
+    void visit(BoolLiteral&)     override;
     void visit(StringLiteral&)   override;
     void visit(Identifier&)      override;
     void visit(BuiltinType&)     override;
@@ -88,7 +120,11 @@ private:
 
     std::ofstream output;
     std::string textBuf, dataBuf, bssBuf, rodataBuf;
-    // Hashmap: 
+    
+    std::size_t labelId = 0;
+    std::vector<std::pair<std::string,std::string>> loopStack;   
+
+
 };
 
 
