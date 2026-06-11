@@ -43,12 +43,18 @@ static void markInited(Scope* s, std::string_view name){
     }
 }
 
+void AstAnalyser::err(std::string_view msg){
+    ++errCount;
+    cl.error("error: " + std::string(msg));
+}
+
 void AstAnalyser::err(const Node& n, std::string_view msg){
-    cl.error(smap.where(n.offset, buffer) + ": " + std::string(msg));
+    ++errCount;
+    cl.error(smap.where(n.offset, buffer) + ": error: " + std::string(msg));
 }
 
 void AstAnalyser::warn(const Node& n, std::string_view msg){
-    cl.warning(smap.where(n.offset, buffer) + ": " + std::string(msg));
+    cl.warning(smap.where(n.offset, buffer) + ": warning: " + std::string(msg));
 }
 
 void AstAnalyser::checkTypes(Type* a, Type* b, const Node& n, std::string_view msg){
@@ -67,8 +73,9 @@ void AstAnalyser::checkTypes(Type* a, Type* b, const Node& n, std::string_view m
 }
 
 
-void AstAnalyser::analyse(TranslationUnit& unit){
+bool AstAnalyser::analyse(TranslationUnit& unit){
     unit.accept(*this);
+    return errCount == 0;
 }
 
 
@@ -80,13 +87,13 @@ void AstAnalyser::visit(TranslationUnit& node){
     }
     auto it = curScope->symbols.find("main");
     if(it == curScope->symbols.end())
-        cl.error("no 'main' function");
+        err("no 'main' function");
     else if(auto f = std::get_if<funcInfo>(&it->second.info)){
         auto rt = dynamic_cast<BuiltinType*>(f->funcType->returnType.get());
         if(!rt || rt->type != BuiltinTypes::Int)
-            cl.error("'main' must return int");
+            err("'main' must return int");
     }else{
-        cl.error("'main' is not a function");
+        err("'main' is not a function");
     }                                   
     delete curScope;
 }

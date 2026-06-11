@@ -16,9 +16,10 @@ class AstAnalyser : public AstVisitor{
 public:
     AstAnalyser(const SourceMap& smap, const std::string& buffer)
         : smap(smap), buffer(buffer) {}
-    void analyse(TranslationUnit& unit);
+    bool analyse(TranslationUnit& unit);   // false if errors
 
 private:
+    void err(std::string_view msg);
     void err(const Node& n, std::string_view msg);
     void warn(const Node& n, std::string_view msg);
     void checkTypes(Type* a, Type* b, const Node& n, std::string_view msg);
@@ -57,6 +58,7 @@ private:
     Scope *curScope = nullptr;
     Type *curType = nullptr, *retType = nullptr;
     bool isInLoop = false;
+    int errCount = 0;
     const SourceMap& smap;
     const std::string& buffer;
     

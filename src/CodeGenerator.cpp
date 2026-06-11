@@ -101,6 +101,19 @@ static RegClass regClassOf(Type* t){
 void CodeGenerator::generate(TranslationUnit& unit){
     unit.accept(*this);
 
+    if(needRt){
+        // write(2, msg, len); exit(1) — raw syscalls, works without libc
+        textBuf += "rt_error:\n";
+        textBuf += "\tmov rdx, rsi\n";
+        textBuf += "\tmov rsi, rdi\n";
+        textBuf += "\tmov rdi, 2\n";
+        textBuf += "\tmov rax, 1\n";
+        textBuf += "\tsyscall\n";
+        textBuf += "\tmov rdi, 1\n";
+        textBuf += "\tmov rax, 60\n";
+        textBuf += "\tsyscall\n";
+    }
+
     if(!dataBuf.empty()) output << "section .data\n" << dataBuf << '\n';
     if(!rodataBuf.empty()) output << "section .rodata\n" << rodataBuf << '\n';
     if(!bssBuf.empty()) output << "section .bss\n" << bssBuf << '\n';
@@ -147,6 +160,11 @@ LValue CodeGenerator::emitLValue(Expr& e){
     if(auto* ix = dynamic_cast<IndexExpr*>(&e)){
         Reg base = emitBaseAddr(*ix->arr);
         Reg idx  = emitRValue(*ix->index);
+        if(auto* at = dynamic_cast<ArrayType*>(ix->arr->resultType.get())){
+            // unsigned compare catches negative index too, pointers stay unchecked
+            current.body += "\tcmp " + R(idx) + ", " + std::to_string(at->size) + "\n";
+            emitRtCheck("jb", "index out of bounds", ix->offset);
+        }
         uint32_t esz = sizeOf(ix->resultType.get());
         if(esz > 1) current.body += "\timul " + R(idx) + ", " + std::to_string(esz) + "\n";
         current.body += "\tadd " + R(base) + ", " + R(idx) + "\n";
@@ -186,6 +204,25 @@ Reg CodeGenerator::loadLValue(const LValue& lv, Type* t){
     Reg dst = lv.ownsReg ? lv.reg : alloc(RegClass::Int);
     emitLoad(dst, lv.mem, t);
     return dst;
+}
+
+//----------------------------------------
+// runtime checks: caller emits cmp/test, jccOk jumps over the death path
+// rdi/rsi clobbered only when dying, so live regs are safe
+
+void CodeGenerator::emitRtCheck(const std::string& jccOk, std::string_view msg, std::size_t off){
+    std::string text = "runtime error: " + std::string(msg)
+        + " at line " + std::to_string(smap.resolve(off, buffer).line);
+    std::string lbl = "rtmsg" + std::to_string(labelId++);
+    rodataBuf += lbl + ": db \"" + text + "\", 10\n";
+
+    std::string ok = newLabel("rtok");
+    current.body += "\t" + jccOk + " " + ok + "\n";
+    current.body += "\tlea rdi, [rel " + lbl + "]\n";
+    current.body += "\tmov rsi, " + std::to_string(text.size() + 1) + "\n";
+    current.body += "\tcall rt_error\n";
+    current.body += ok + ":\n";
+    needRt = true;
 }
 
 void CodeGenerator::visit(TranslationUnit& node){
@@ -462,7 +499,8 @@ void CodeGenerator::visit(BinaryExpr& node){
                     current.body += "\tsub "  + R(l) + ", " + R(r) + "\n"; break;
                 case BinaryOp::Mul: current.body += "\timul " + R(l) + ", " + R(r) + "\n"; break;
                 case BinaryOp::Div: case BinaryOp::Mod:
-                    //current.body += "\tcmp " + R(r) + ", 0\n\tje .Lrt_divzero\n";  // int-only
+                    current.body += "\ttest " + R(r) + ", " + R(r) + "\n";
+                    emitRtCheck("jnz", "division by zero", node.offset);
                     current.body += "\tmov rax, " + R(l) + "\n\tcqo\n\tidiv " + R(r) + "\n";
                     current.body += "\tmov " + R(l) + ", " + (node.op==BinaryOp::Div ? "rax" : "rdx") + "\n";
                     break;

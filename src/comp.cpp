@@ -1,6 +1,9 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <filesystem>
+#include <format>
+#include <cstdlib>
 
 #include "Preprocessor.hpp"
 #include "Lexer.hpp"
@@ -10,29 +13,58 @@
 #include "CodeGenerator.hpp"
 
 
+static int usage(){
+    std::cerr << "usage: comp <file> [-o <out.asm>] [--dump-tokens] [--dump-ast]" << std::endl;
+    return 1;
+}
+
 int main(int argc, char *argv[]){
-    Preprocessor p;
-    if(argc < 2) return 1;
-    std::string name = argv[1];
-    std::string s = p.include_files(name);
-    
-    /*
-    std::cout << "File to compile:" << std::endl;
-    std::cout << s << std::endl;
-    for(auto& i : arrTokens){
-        std::cout << i.data << "  ";
+    std::string in, out, obj, exe;
+    bool dumpTokens = false, dumpAst = false, executable = false;
+
+    for(int i = 1; i < argc; ++i){
+        std::string a = argv[i];
+        if(a == "-o"){
+            if(++i == argc) return usage();
+            out = argv[i];
+        }
+        if(a == "-e"){
+            executable = true;
+        }
+        else if(a == "--dump-tokens") dumpTokens = true;
+        else if(a == "--dump-ast")    dumpAst = true;
+        else if(in.empty())           in = a;
+        else return usage();
     }
-        */
+    if(in.empty()) return usage();
+    if(out.empty()) out = std::filesystem::path(in).replace_extension(".asm").string();
 
-    auto arrTokens = Lexer(s).tokenize();
-    std::unique_ptr<TranslationUnit> tu = Parser(arrTokens, p.get_source_map(), s).parse();
+    try{
+        Preprocessor p;
+        std::string s = p.include_files(in);
 
-    //std::cout << "AST:" << std::endl;
-    //AstPrinter().print(*tu);
+        auto arrTokens = Lexer(s).tokenize();
+        if(dumpTokens){
+            for(auto& t : arrTokens) std::cout << t.data << "  ";
+            std::cout << std::endl;
+        }
 
-    AstAnalyser(p.get_source_map(), s).analyse(*tu);
+        std::unique_ptr<TranslationUnit> tu = Parser(arrTokens, p.get_source_map(), s).parse();
+        if(dumpAst) AstPrinter().print(*tu);
 
-    CodeGenerator(argv[2]).generate(*tu);
+        if(!AstAnalyser(p.get_source_map(), s).analyse(*tu)) return 1;
+
+        CodeGenerator(out, p.get_source_map(), s).generate(*tu);
+        
+        if(executable){
+            obj = std::filesystem::path(in).replace_extension(".o").string();
+            exe = std::filesystem::path(in).replace_extension(".exe").string();
+            std::system(std::format("nasm -felf64 {} && gcc -no-pie {} -o {}", out, obj, exe).c_str());
+        }
+    }catch(const std::exception& e){
+        std::cerr << e.what() << std::endl;
+        return 1;
+    }
 }
 
 

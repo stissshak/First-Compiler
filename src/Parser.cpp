@@ -53,7 +53,7 @@ bool Parser::match(TokenKind type){
 }
 
 void Parser::fail(const std::string& msg) const{
-	throw std::runtime_error(smap.where(peek().offset, buffer) + ": " + msg);
+	throw std::runtime_error(smap.where(peek().offset, buffer) + ": error: " + msg);
 }
 
 void Parser::expect(TokenKind kind){

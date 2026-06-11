@@ -12,6 +12,7 @@
 
 #include "AstVisitor.hpp"
 #include "Ast.hpp"
+#include "SourceMap.hpp"
 
 enum class Section : uint8_t{Bss, Data, Rodata, Text};
 enum class Storage : uint8_t{Global, Stack, Register};
@@ -60,7 +61,8 @@ struct FuncInfo{
 
 class CodeGenerator : public AstVisitor{
 public:
-    CodeGenerator(const std::string &path){
+    CodeGenerator(const std::string &path, const SourceMap& smap, const std::string& buffer)
+        : smap(smap), buffer(buffer){
         auto canon = std::filesystem::weakly_canonical(path).string();
         output.open(canon);
     }
@@ -76,6 +78,7 @@ private:
     void emitLoad(Reg dst, const std::string& mem, Type* t);
     void emitStore(const std::string& mem, Reg src, Type* t);
     Reg loadLValue(const LValue& lv, Type* t);
+    void emitRtCheck(const std::string& jccOk, std::string_view msg, std::size_t off);
     static std::string memOf(int32_t off){ return "[rbp" + std::to_string(off) + "]"; }
     std::string newLabel(const std::string& tag){ return ".L" + tag + std::to_string(labelId++); }
 
@@ -122,7 +125,11 @@ private:
     std::string textBuf, dataBuf, bssBuf, rodataBuf;
     
     std::size_t labelId = 0;
-    std::vector<std::pair<std::string,std::string>> loopStack;   
+    std::vector<std::pair<std::string,std::string>> loopStack;
+
+    const SourceMap& smap;
+    const std::string& buffer;
+    bool needRt = false;
 
 
 };
