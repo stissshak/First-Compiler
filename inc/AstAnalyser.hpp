@@ -20,6 +20,7 @@ public:
     bool analyse(TranslationUnit& unit);   // false if errors
 
 private:
+    void addBuiltins();
     void err(std::string_view msg);
     void err(const Node& n, std::string_view msg);
     void warn(const Node& n, std::string_view msg);

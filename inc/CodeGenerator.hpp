@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
+#include <unordered_set>
 #include <filesystem>
 #include <fstream>
 #include <cstdint>
@@ -125,6 +126,7 @@ private:
     FuncInfo current;
 
     std::unordered_map<std::string_view, FuncDecl*> funcs;
+    std::unordered_set<std::string> usedExterns;   // builtins actually called
 
     std::ofstream output;
     std::string textBuf, dataBuf, bssBuf, rodataBuf;

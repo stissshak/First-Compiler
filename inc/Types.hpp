@@ -13,26 +13,30 @@ enum class castResult{
 
 // TODO nullptr_t
 
-inline const castResult castMatrix[7][7] = {
-//	         int                   float                 char                  void               custom             ptr                bool
-/* int  */	{castResult::Equal,    castResult::Implicit, castResult::Implicit, castResult::No,    castResult::No,    castResult::Warn,  castResult::Implicit},
-/* float */	{castResult::Implicit, castResult::Equal,    castResult::Implicit, castResult::No,    castResult::No,    castResult::No,    castResult::No},
-/* char */	{castResult::Implicit, castResult::Implicit, castResult::Equal,    castResult::No,    castResult::No,    castResult::Warn,  castResult::Implicit},
-/* void */	{castResult::No,       castResult::No,       castResult::No,       castResult::Equal, castResult::No,    castResult::No,    castResult::No},
-/* cust */	{castResult::No,       castResult::No,       castResult::No,       castResult::No,    castResult::Equal, castResult::No,    castResult::No},
-/* ptr  */	{castResult::Warn,     castResult::No,       castResult::Warn,     castResult::No,    castResult::No,    castResult::Equal, castResult::No},
-/* bool */	{castResult::Implicit, castResult::No,       castResult::Implicit, castResult::No,    castResult::No,    castResult::No,    castResult::Equal},
-};
+inline const castResult castMatrix[8][8] = {
+//	         int                   float                 char                  void               custom             ptr                bool                  byte
+/* int  */	{castResult::Equal,    castResult::Implicit, castResult::Implicit, castResult::No,    castResult::No,    castResult::Warn,  castResult::Implicit, castResult::No},
+/* float */	{castResult::Implicit, castResult::Equal,    castResult::Implicit, castResult::No,    castResult::No,    castResult::No,    castResult::No,       castResult::No},
+/* char */	{castResult::Implicit, castResult::Implicit, castResult::Equal,    castResult::No,    castResult::No,    castResult::Warn,  castResult::Implicit, castResult::No},
+/* void */	{castResult::No,       castResult::No,       castResult::No,       castResult::Equal, castResult::No,    castResult::No,    castResult::No,       castResult::No},
+/* cust */	{castResult::No,       castResult::No,       castResult::No,       castResult::No,    castResult::Equal, castResult::No,    castResult::No,       castResult::No},
+/* ptr  */	{castResult::Warn,     castResult::No,       castResult::Warn,     castResult::No,    castResult::No,    castResult::Equal, castResult::No,       castResult::No},
+/* bool */	{castResult::Implicit, castResult::No,       castResult::Implicit, castResult::No,    castResult::No,    castResult::No,    castResult::Equal,    castResult::No},
+/* byte */	{castResult::No,       castResult::No,       castResult::No,       castResult::No,    castResult::No,    castResult::No,    castResult::No,       castResult::Equal},
+};   // byte never converts implicitly, explicit cast handled in CastExpr
 
 inline int typeIndex(Type* t){
     if(auto b = dynamic_cast<BuiltinType*>(t)){
         switch(b->type){
 			case BuiltinTypes::Int:    return 0;
+			case BuiltinTypes::Short:  return 0;   // casts like int, only size differs
+			case BuiltinTypes::Long:   return 0;
 			case BuiltinTypes::Float:  return 1;
 			case BuiltinTypes::Char:   return 2;
 			case BuiltinTypes::Void:   return 3;
 			case BuiltinTypes::Custom: return 4;
 			case BuiltinTypes::Bool:   return 6;
+			case BuiltinTypes::Byte:   return 7;
 
             default: return -1;
         }
@@ -42,7 +46,8 @@ inline int typeIndex(Type* t){
 }
 
 inline bool isVoidPtr(const PointerType* pointer){
-    return dynamic_cast<BuiltinType*>(pointer->base.get())->type == BuiltinTypes::Void;
+    auto b = dynamic_cast<BuiltinType*>(pointer->base.get());
+    return b && b->type == BuiltinTypes::Void;
 }
 
 inline castResult checkCast( Type* from, Type* to){
@@ -50,6 +55,21 @@ inline castResult checkCast( Type* from, Type* to){
     if(auto arr = dynamic_cast<ArrayType*>(to)){
         PointerType p(arr->elemType->clone());
         return checkCast(from, &p);
+    }
+
+    // func types match exactly or not at all
+    auto ff = dynamic_cast<FuncType*>(from);
+    auto tf = dynamic_cast<FuncType*>(to);
+    if(ff || tf){
+        if(!ff || !tf) return castResult::No;
+        if(ff->params.size() != tf->params.size() || ff->variadic != tf->variadic)
+            return castResult::No;
+        if(checkCast(ff->returnType.get(), tf->returnType.get()) != castResult::Equal)
+            return castResult::No;
+        for(std::size_t i = 0; i < ff->params.size(); ++i)
+            if(checkCast(ff->params[i].get(), tf->params[i].get()) != castResult::Equal)
+                return castResult::No;
+        return castResult::Equal;
     }
 
     int fromi = typeIndex(from);
@@ -69,6 +89,8 @@ inline castResult checkCast( Type* from, Type* to){
     if(fromi == 5 && toi == 5){
         auto fromp = static_cast<PointerType*>(from);
         auto top = static_cast<PointerType*>(to);
+        // from = target, to = actual value; losing const on the way warns
+        if(top->constBase && !fromp->constBase) return castResult::Warn;
         if(isVoidPtr(fromp) || isVoidPtr(top)) return castResult::Implicit;
         return checkCast(fromp->base.get(), top->base.get());
     }

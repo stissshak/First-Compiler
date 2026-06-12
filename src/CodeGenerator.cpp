@@ -96,10 +96,13 @@ inline uint32_t sizeOf(Type* t){
     if(auto b = dynamic_cast<BuiltinType*>(t)){
         switch(b->type){
             case BuiltinTypes::Int:   return 4;
+            case BuiltinTypes::Short: return 2;
+            case BuiltinTypes::Long:  return 8;
             case BuiltinTypes::Float: return 8;
             case BuiltinTypes::Char:  return 1;
             case BuiltinTypes::Void:  return 0;
             case BuiltinTypes::Bool:  return 1;
+            case BuiltinTypes::Byte:  return 1;
             case BuiltinTypes::Custom:{
                 auto l = layoutOf(t);
                 return l ? l->size : 0;
@@ -107,6 +110,7 @@ inline uint32_t sizeOf(Type* t){
         }
     }
     if(dynamic_cast<PointerType*>(t)) return 8;
+    if(dynamic_cast<FuncType*>(t)) return 8;   // func pointer
     if(auto a = dynamic_cast<ArrayType*>(t)) return a->size * sizeOf(a->elemType.get());
     return 0;
 }
@@ -140,10 +144,14 @@ void CodeGenerator::generate(TranslationUnit& unit){
         textBuf += "\tsyscall\n";
     }
 
+    std::string ext;
+    for(auto& name : usedExterns)
+        if(!funcs.count(name)) ext += "extern " + name + "\n";
+
     if(!dataBuf.empty()) output << "section .data\n" << dataBuf << '\n';
     if(!rodataBuf.empty()) output << "section .rodata\n" << rodataBuf << '\n';
     if(!bssBuf.empty()) output << "section .bss\n" << bssBuf << '\n';
-    output << "section .text\n" << textBuf;
+    output << "section .text\n" << ext << textBuf;
 }
 
 Reg CodeGenerator::alloc(RegClass cls){
@@ -182,6 +190,8 @@ LValue CodeGenerator::emitLValue(Expr& e){
     }
     if(auto* u = dynamic_cast<UnaryExpr*>(&e); u && u->op == UnaryOp::Deref){
         Reg r = emitRValue(*u->child);
+        current.body += "\ttest " + R(r) + ", " + R(r) + "\n";
+        emitRtCheck("jnz", "null pointer dereference", u->offset);
         return LValue{"[" + std::string(regName(r)) + "]", r, true};
     }
     if(auto* ax = dynamic_cast<AccessExpr*>(&e)){
@@ -190,6 +200,8 @@ LValue CodeGenerator::emitLValue(Expr& e){
         if(ax->kind == AccessKind::Arrow){
             r = emitRValue(*ax->object);
             st = static_cast<PointerType*>(st)->base.get();
+            current.body += "\ttest " + R(r) + ", " + R(r) + "\n";
+            emitRtCheck("jnz", "null pointer dereference", ax->offset);
         }else{
             r = lvalueAddr(*ax->object);
         }
@@ -204,9 +216,13 @@ LValue CodeGenerator::emitLValue(Expr& e){
         Reg base = emitBaseAddr(*ix->arr);
         Reg idx  = emitRValue(*ix->index);
         if(auto* at = dynamic_cast<ArrayType*>(ix->arr->resultType.get())){
-            // unsigned compare catches negative index too, pointers stay unchecked
+            // unsigned compare catches negative index too
             current.body += "\tcmp " + R(idx) + ", " + std::to_string(at->size) + "\n";
             emitRtCheck("jb", "index out of bounds", ix->offset);
+        }else{
+            // pointer base: size unknown, only null is checkable
+            current.body += "\ttest " + R(base) + ", " + R(base) + "\n";
+            emitRtCheck("jnz", "null pointer dereference", ix->offset);
         }
         uint32_t esz = sizeOf(ix->resultType.get());
         if(esz > 1) current.body += "\timul " + R(idx) + ", " + std::to_string(esz) + "\n";
@@ -353,9 +369,10 @@ void CodeGenerator::visit(StructDecl& node){
 }
 
 static void initFreeRegs(FuncInfo& f){
+      // rcx stays out of the pool, shifts need it as scratch (cl)
       f.freeRegs = {
           Reg::rbx, Reg::r12, Reg::r13, Reg::r14, Reg::r15,
-          Reg::rcx, Reg::rsi, Reg::rdi, Reg::r8, Reg::r9, Reg::r10, Reg::r11,
+          Reg::rsi, Reg::rdi, Reg::r8, Reg::r9, Reg::r10, Reg::r11,
       };
       f.freeXmm = {
           Reg::xmm0, Reg::xmm1, Reg::xmm2, Reg::xmm3,
@@ -407,9 +424,10 @@ void CodeGenerator::emitFunction(FuncDecl& node){
 }
 
 void CodeGenerator::visit(FuncDecl& node){
+    funcs[node.name] = &node;
     if(!node.body){
-        textBuf += "extern " + std::string(node.name) + "\n";   // ← NEW
-        return; 
+        if(node.isExtern) textBuf += "extern " + std::string(node.name) + "\n";
+        return;   // plain forward decl, the definition emits the label
     }
 
     current = FuncInfo{};
@@ -645,6 +663,14 @@ void CodeGenerator::visit(BinaryExpr& node){
                     }
                     current.body += "\tsub "  + R(l) + ", " + R(r) + "\n"; break;
                 case BinaryOp::Mul: current.body += "\timul " + R(l) + ", " + R(r) + "\n"; break;
+                case BinaryOp::BitAnd: current.body += "\tand " + R(l) + ", " + R(r) + "\n"; break;
+                case BinaryOp::BitOr:  current.body += "\tor "  + R(l) + ", " + R(r) + "\n"; break;
+                case BinaryOp::BitXor: current.body += "\txor " + R(l) + ", " + R(r) + "\n"; break;
+                case BinaryOp::Shl: case BinaryOp::Shr:
+                    // count goes through cl, x86 masks it to 6 bits
+                    current.body += "\tmov rcx, " + R(r) + "\n";
+                    current.body += (node.op==BinaryOp::Shl ? "\tsal " : "\tsar ") + R(l) + ", cl\n";
+                    break;
                 case BinaryOp::Div: case BinaryOp::Mod:
                     current.body += "\ttest " + R(r) + ", " + R(r) + "\n";
                     emitRtCheck("jnz", "division by zero", node.offset);
@@ -704,8 +730,27 @@ void CodeGenerator::visit(UnaryExpr& node){
 void CodeGenerator::visit(CallExpr& node){
     static const Reg argReg[6] = {Reg::rdi, Reg::rsi, Reg::rdx, Reg::rcx, Reg::r8, Reg::r9};
     auto* id = dynamic_cast<Identifier*>(node.func.get());
-    std::string name = std::string(id->name);
+    bool direct = id && !findVar(id->name);   // plain function name, not a func-ptr var
     std::size_t n = node.param.size();
+
+    // assert is two instructions, not a call
+    if(direct && id->name == "assert" && !funcs.count("assert")){
+        Reg r = emitRValue(*node.param[0]);
+        current.body += "\ttest " + R(r) + ", " + R(r) + "\n";
+        emitRtCheck("jnz", "assertion failed", node.offset);
+        resultReg = r;
+        return;
+    }
+
+    // builtins map onto libc names
+    std::string callee = direct ? std::string(id->name) : "";
+    bool isPanic = false;
+    if(direct && !funcs.count(id->name)){
+        if(callee == "print")      callee = "printf";
+        else if(callee == "input") callee = "scanf";
+        else if(callee == "panic"){ callee = "puts"; isPanic = true; usedExterns.insert("exit"); }
+        usedExterns.insert(callee);
+    }
 
     // everything live is caller-saved here
     std::vector<Reg> spill = current.inUse;
@@ -713,6 +758,16 @@ void CodeGenerator::visit(CallExpr& node){
     std::vector<Reg> spillX = current.inUseXmm;
     for(Reg r : spillX) current.body += "\tsub rsp, 8\n\tmovsd [rsp], " + R(r) + "\n";
     current.pushDepth += spill.size() + spillX.size();
+
+    // func pointer goes to a temp slot too, it would not survive the arg moves
+    std::size_t fpSlot = 0;
+    if(!direct){
+        Reg r = emitRValue(*node.func);
+        current.body += "\tsub rsp, 8\n\tmov [rsp], " + R(r) + "\n";
+        ++current.pushDepth;
+        fpSlot = 1;
+        freeReg(r);
+    }
 
     // evaluate args into temp slots, arg i ends at [rsp + 8*(n-1-i)]
     std::vector<RegClass> cls(n);
@@ -753,10 +808,16 @@ void CodeGenerator::visit(CallExpr& node){
     }
 
     current.body += "\tmov eax, " + std::to_string(sse) + "\n";   // varargs: al = sse args
-    current.body += "\tcall " + name + "\n";
+    if(direct){
+        current.body += "\tcall " + callee + "\n";
+        if(isPanic) current.body += "\tmov edi, 1\n\tcall exit\n";   // never returns
+    }else{
+        current.body += "\tmov r10, [rsp + " + std::to_string(8*(n + sh)) + "]\n";
+        current.body += "\tcall r10\n";
+    }
     current.hasCall = true;
 
-    std::size_t cleanup = n + onStack.size() + (fill ? 1 : 0);
+    std::size_t cleanup = n + fpSlot + onStack.size() + (fill ? 1 : 0);
     if(cleanup) current.body += "\tadd rsp, " + std::to_string(8*cleanup) + "\n";
     current.pushDepth -= cleanup;
 
@@ -818,6 +879,48 @@ void CodeGenerator::visit(AccessExpr& node){
     resultReg = loadLValue(emitLValue(node), node.resultType.get());
 }
 
+static std::string typeStr(Type* t){
+    if(auto b = dynamic_cast<BuiltinType*>(t)){
+        switch(b->type){
+            case BuiltinTypes::Int:    return "int";
+            case BuiltinTypes::Short:  return "short";
+            case BuiltinTypes::Long:   return "long";
+            case BuiltinTypes::Float:  return "float";
+            case BuiltinTypes::Char:   return "char";
+            case BuiltinTypes::Bool:   return "bool";
+            case BuiltinTypes::Void:   return "void";
+            case BuiltinTypes::Byte:   return "byte";
+            case BuiltinTypes::Custom: return std::string(b->name);
+        }
+    }
+    if(auto p = dynamic_cast<PointerType*>(t)) return typeStr(p->base.get()) + "*";
+    if(auto a = dynamic_cast<ArrayType*>(t))
+        return typeStr(a->elemType.get()) + "[" + std::to_string(a->size) + "]";
+    if(auto f = dynamic_cast<FuncType*>(t)){
+        std::string s = typeStr(f->returnType.get()) + "(";
+        for(std::size_t i = 0; i < f->params.size(); ++i)
+            s += (i ? ", " : "") + typeStr(f->params[i].get());
+        return s + ")";
+    }
+    return "?";
+}
+
+// both fold at compile time, nothing is evaluated
+void CodeGenerator::visit(SizeofExpr& node){
+    Type* t = node.target ? node.target.get() : node.expr->resultType.get();
+    Reg r = alloc();
+    current.body += "\tmov " + R(r) + ", " + std::to_string(sizeOf(t)) + "\n";
+    resultReg = r;
+}
+
+void CodeGenerator::visit(TypeidExpr& node){
+    std::string lbl = "Lstr" + std::to_string(labelId++);
+    rodataBuf += lbl + ": db \"" + typeStr(node.expr->resultType.get()) + "\", 0\n";
+    Reg r = alloc();
+    current.body += "\tlea " + R(r) + ", [abs " + lbl + "]\n";
+    resultReg = r;
+}
+
 void CodeGenerator::visit(IntLiteral& node){
     Reg r = alloc(regClassOf(node.resultType.get()));
     current.body += "\tmov " + std::string(regName(r)) + ", " + std::to_string(node.value) + "\n";
@@ -868,6 +971,13 @@ void CodeGenerator::visit(StringLiteral& node){
 }
 
 void CodeGenerator::visit(Identifier& node){
+    // function name as a value is its address
+    if(!findVar(node.name) && funcs.count(node.name)){
+        Reg r = alloc();
+        current.body += "\tlea " + R(r) + ", [rel " + std::string(node.name) + "]\n";
+        resultReg = r;
+        return;
+    }
     resultReg = loadLValue(emitLValue(node), node.resultType.get());
 }
 

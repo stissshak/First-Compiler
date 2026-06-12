@@ -11,8 +11,8 @@
 //----------------------------------------
 // string_view to int/float
 
-int svtoi(std::string_view str){
-	int res = 0;
+long long svtoi(std::string_view str){
+	long long res = 0;
 	std::size_t len = str.length();
 	for(std::size_t i = 0; i < len; ++i){
 		res *= 10;
@@ -85,6 +85,9 @@ bool Parser::isType(const Token& t){
 		case TokenKind::CharK:
 		case TokenKind::VoidK:
 		case TokenKind::BoolK:
+		case TokenKind::ByteK:
+		case TokenKind::ShortK:
+		case TokenKind::LongK:
 			return true;
 		case TokenKind::Identifier:
 			if(std::find(userTypes.begin(), userTypes.end(), t.data) == userTypes.end()){
@@ -113,7 +116,16 @@ std::unique_ptr<Type> Parser::parseBaseType() {
 		case TokenKind::BoolK:
 			take();
 			return std::make_unique<BuiltinType>(BuiltinTypes::Bool);
-		
+		case TokenKind::ByteK:
+			take();
+			return std::make_unique<BuiltinType>(BuiltinTypes::Byte);
+		case TokenKind::ShortK:
+			take();
+			return std::make_unique<BuiltinType>(BuiltinTypes::Short);
+		case TokenKind::LongK:
+			take();
+			return std::make_unique<BuiltinType>(BuiltinTypes::Long);
+
 		default:
 			if (peek().kind != TokenKind::Identifier)
         		fail("Expected type name");
@@ -128,6 +140,19 @@ std::unique_ptr<Type> Parser::parseBaseType() {
 
 std::unique_ptr<Type> Parser::parseType(){
 	auto type = parseBaseType();
+	// func type: int(int, char*); lookahead keeps casts like (int)(x) working
+	if(peek().kind == TokenKind::LPar
+			&& (peek(1).kind == TokenKind::RPar || isType(peek(1)))){
+		take();
+		auto f = std::make_unique<FuncType>();
+		f->returnType = std::move(type);
+		while(!isEnd() && peek().kind != TokenKind::RPar){
+			f->params.push_back(parseType());
+			if(!match(TokenKind::Comma)) break;
+		}
+		expect(TokenKind::RPar);
+		type = std::move(f);
+	}
 	while(match(TokenKind::Star)){
 		auto p = std::make_unique<PointerType>();
 		p->base = std::move(type);
@@ -142,6 +167,13 @@ std::unique_ptr<Type> Parser::parseType(){
 std::unique_ptr<Decl> Parser::parseDecl(){
 	if(match(TokenKind::Struct)){
 		return parseStruct();
+	}
+	if(match(TokenKind::Extern)){
+		auto d = parseFunction();
+		auto f = static_cast<FuncDecl*>(d.get());
+		if(f->body) fail("Extern function cannot have a body");
+		f->isExtern = true;
+		return d;
 	}
 	if(match(TokenKind::Typedef)){
 		auto t = parseType();
@@ -232,8 +264,18 @@ std::unique_ptr<Decl> Parser::parseFunction(){
 }
 
 std::unique_ptr<Decl> Parser::parseVarDecl(){
-	bool isConst = match(TokenKind::Const);
+	bool leadConst = match(TokenKind::Const);
 	auto type = parseType();
+	bool isConst = match(TokenKind::Const);   // int* const p — the var itself
+	if(leadConst){
+		if(auto p = dynamic_cast<PointerType*>(type.get())){
+			// const int* p — const belongs to the deepest base
+			PointerType* in = p;
+			while(auto next = dynamic_cast<PointerType*>(in->base.get())) in = next;
+			in->constBase = true;
+		}
+		else isConst = true;   // const int x
+	}
 
 	if (peek().kind != TokenKind::Identifier) fail("Expected type name");
 

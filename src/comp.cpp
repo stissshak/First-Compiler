@@ -59,7 +59,8 @@ int main(int argc, char *argv[]){
         if(executable){
             obj = std::filesystem::path(in).replace_extension(".o").string();
             exe = std::filesystem::path(in).replace_extension(".exe").string();
-            std::system(std::format("nasm -felf64 {} && gcc -no-pie {} -o {}", out, obj, exe).c_str());
+            if(std::system(std::format("nasm -felf64 {} && gcc -no-pie {} -o {}", out, obj, exe).c_str()) != 0)
+                return 1;
         }
     }catch(const std::exception& e){
         std::cerr << e.what() << std::endl;

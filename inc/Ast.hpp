@@ -54,6 +54,7 @@ struct FuncDecl : Decl{
 	std::vector<std::unique_ptr<VarDecl>> params;
 	std::unique_ptr<Stmt> body;
 	bool variadic = false;
+	bool isExtern = false;   // resolved at link time, may stay undefined
 
 	ACCEPT
 };
@@ -201,7 +202,7 @@ struct CastExpr : Expr{
 };
 
 struct IntLiteral : Expr{
-	int value;
+	long long value;
 
 	ACCEPT
 };
@@ -240,7 +241,7 @@ struct Identifier : Expr{
 
 
 enum class BuiltinTypes{
-	Int, Float, Char, Void, Custom, Bool
+	Int, Float, Char, Void, Custom, Bool, Byte, Short, Long
 };
 
 struct BuiltinType : Type{
@@ -258,11 +259,13 @@ struct BuiltinType : Type{
 
 struct PointerType : Type{
 	std::unique_ptr<Type> base;
+	bool constBase = false;   // const int* — no stores through it
 	PointerType(std::unique_ptr<Type> b = nullptr) : base(std::move(b)) {}
 
 	std::unique_ptr<Type> clone() const override{
         auto p = std::make_unique<PointerType>();
         p->base = base->clone();
+        p->constBase = constBase;
         return p;
     }
 

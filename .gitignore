@@ -7,3 +7,6 @@ tmp/
 obj/
 bin/
 
+*.asm
+*.o
+*.exe

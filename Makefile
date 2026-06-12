@@ -18,8 +18,11 @@ EXE=$(BIN_DIR)/comp
 
 all: debug #run
 
+build: debug
+
 run: $(EXE)
-	@./$(EXE)
+	./$(EXE) examples/structs.mpl -e
+	@./examples/structs.exe
 
 debug: CFLAGS += -g
 debug: $(EXE)

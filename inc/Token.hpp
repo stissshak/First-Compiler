@@ -88,12 +88,16 @@ enum class TokenKind{
     Struct,
     Union,
     Enum,
+    Extern,
 
     IntK,
     FloatK,
     BoolK,
     CharK,
     VoidK,
+    ByteK,
+    ShortK,
+    LongK,
     
 
     Invalid,

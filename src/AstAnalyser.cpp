@@ -16,6 +16,7 @@ struct varInfo{
 struct funcInfo{
     FuncType* funcType;
     bool isDefined;
+    bool isExtern = false;
 };
 
 struct strctInfo{
@@ -33,6 +34,11 @@ struct Scope{
 
 strctInfo* lookupStruct(std::string_view name, Scope* curScope);
 
+static bool isByte(Type* t){
+    auto b = dynamic_cast<BuiltinType*>(t);
+    return b && b->type == BuiltinTypes::Byte;
+}
+
 static varInfo* lookupVar(Scope* s, std::string_view name){
     for(; s; s = s->parent){
         auto it = s->symbols.find(name);
@@ -44,6 +50,15 @@ static varInfo* lookupVar(Scope* s, std::string_view name){
 
 static void markInited(Scope* s, std::string_view name){
     if(auto v = lookupVar(s, name)) v->inited = true;
+}
+
+static bool isFuncName(Scope* s, std::string_view name){
+    for(; s; s = s->parent){
+        auto it = s->symbols.find(name);
+        if(it == s->symbols.end()) continue;
+        return std::holds_alternative<funcInfo>(it->second.info);
+    }
+    return false;
 }
 
 void AstAnalyser::err(std::string_view msg){
@@ -82,9 +97,42 @@ bool AstAnalyser::analyse(TranslationUnit& unit){
 }
 
 
+// libc-backed builtins, usable without declaration (specs/semantics.md §8)
+void AstAnalyser::addBuiltins(){
+    auto add = [&](std::string_view name, std::unique_ptr<FuncType> f){
+        funcInfo fi{f.get()};
+        fi.isExtern = true;   // never defined in MPL, redefinition = error
+        funcTypes.push_back(std::move(f));
+        curScope->symbols.emplace(name, DeclInfo{fi});
+    };
+    auto sig = [&](Type& ret, Type* param, bool variadic){
+        auto f = std::make_unique<FuncType>();
+        f->returnType = ret.clone();
+        if(param) f->params.push_back(param->clone());
+        f->variadic = variadic;
+        return f;
+    };
+
+    PointerType charPtr(charType.clone());
+    PointerType voidPtr(voidType.clone());
+
+    add("print",  sig(intType,  &charPtr, true));    // printf
+    add("input",  sig(intType,  &charPtr, true));    // scanf
+    add("exit",   sig(voidType, &intType, false));
+    add("panic",  sig(voidType, &charPtr, false));   // message + exit(1)
+    add("assert", sig(voidType, &boolType, false));  // runtime error if false
+    add("free",   sig(voidType, &voidPtr, false));
+
+    auto m = std::make_unique<FuncType>();           // void* malloc(int)
+    m->returnType = voidPtr.clone();
+    m->params.push_back(intType.clone());
+    add("malloc", std::move(m));
+}
+
 void AstAnalyser::visit(TranslationUnit& node){
     curScope = new Scope;
     curScope->parent = nullptr;
+    addBuiltins();
     for(std::size_t i = 0; i < node.decls.size(); ++i){
         node.decls[i]->accept(*this);
     }
@@ -97,7 +145,14 @@ void AstAnalyser::visit(TranslationUnit& node){
             err("'main' must return int");
     }else{
         err("'main' is not a function");
-    }                                   
+    }
+
+    // only extern funcs may stay without a body
+    for(auto& [name, di] : curScope->symbols){
+        if(auto f = std::get_if<funcInfo>(&di.info))
+            if(!f->isDefined && !f->isExtern)
+                err("Function '" + std::string(name) + "' is declared but never defined");
+    }
     delete curScope;
 }
 void AstAnalyser::visit(VarDecl& node){
@@ -189,6 +244,10 @@ void AstAnalyser::visit(FuncDecl& node){
             return;
         }
         if(node.body){
+            if(existing->isExtern){
+                err(node, "Extern function cannot be defined");
+                return;
+            }
             existing->isDefined = true;
             analyseFuncBody(node);
         }
@@ -204,10 +263,8 @@ void AstAnalyser::visit(FuncDecl& node){
     }
 
     funcInfo fi{ft.get()};
+    fi.isExtern = node.isExtern;
     funcTypes.push_back(std::move(ft));
-
-    
-    
 
     if(!node.body){
         fi.isDefined = false;
@@ -305,9 +362,13 @@ void AstAnalyser::visit(DeclStmt& node){
 // Change assign, from binary to other AST node
 void AstAnalyser::visit(BinaryExpr& node){
     if(node.op >= BinaryOp::Assign){
+        if(node.op > BinaryOp::MinusAssign)   // TODO *= /= %= and bit-assigns
+            err(node, "This compound assign is not supported yet");
         if(auto id = dynamic_cast<Identifier*>(node.left.get())){
             if(auto v = lookupVar(curScope, id->name); v && v->isConst)
                 err(node, "Assign to const var");
+            else if(!v && isFuncName(curScope, id->name))
+                err(node, "Function is not assignable");
             // before visiting left, otherwise the target itself errors
             if(node.op == BinaryOp::Assign) markInited(curScope, id->name);
         }
@@ -318,6 +379,23 @@ void AstAnalyser::visit(BinaryExpr& node){
     node.right->accept(*this);
     auto rType = curType;
 
+    // raw data: only =, ==, != are allowed
+    if((isByte(lType) || isByte(rType))
+            && node.op != BinaryOp::Assign
+            && node.op != BinaryOp::Equal && node.op != BinaryOp::NotEqual)
+        err(node, "byte is not arithmetic");
+
+    if(node.op >= BinaryOp::Assign){
+        // no stores through const int*
+        if(auto u = dynamic_cast<UnaryExpr*>(node.left.get()); u && u->op == UnaryOp::Deref){
+            if(auto p = dynamic_cast<PointerType*>(u->child->resultType.get()); p && p->constBase)
+                err(node, "Assign through const pointer");
+        }
+        if(auto ix = dynamic_cast<IndexExpr*>(node.left.get())){
+            if(auto p = dynamic_cast<PointerType*>(ix->arr->resultType.get()); p && p->constBase)
+                err(node, "Assign through const pointer");
+        }
+    }
 
     checkTypes(lType, rType, node, "Incompatible types in binary expression");
 
@@ -354,6 +432,9 @@ void AstAnalyser::visit(UnaryExpr& node){
 
     node.child->accept(*this);
 
+    if(isByte(curType) && node.op != UnaryOp::AddressOf)
+        err(node, "byte is not arithmetic");
+
     switch(node.op){
         case UnaryOp::Pos:
         case UnaryOp::Neg:
@@ -372,6 +453,11 @@ void AstAnalyser::visit(UnaryExpr& node){
             }
             auto pt = std::make_unique<PointerType>();
             pt->base = curType->clone();
+            // &const-var gives const int*
+            if(auto id = dynamic_cast<Identifier*>(node.child.get())){
+                if(auto v = lookupVar(curScope, id->name); v && v->isConst)
+                    pt->constBase = true;
+            }
             curType = pt.get();
             ptrTypes.push_back(std::move(pt));
             break;
@@ -421,7 +507,12 @@ void AstAnalyser::visit(CallExpr& node){
 
 void AstAnalyser::visit(CastExpr& node){
     node.expr->accept(*this);
-    checkTypes(node.target.get(), curType, node, "Incompatible cast types");
+    // byte converts only by explicit cast, and only with int/char
+    bool byteCast = (isByte(node.target.get()) || isByte(curType))
+        && typeIndex(node.target.get()) != -1 && typeIndex(curType) != -1
+        && typeIndex(node.target.get()) != 1 && typeIndex(curType) != 1;   // not float
+    if(!byteCast)
+        checkTypes(node.target.get(), curType, node, "Incompatible cast types");
     curType = node.target.get();
     node.resultType = curType->clone();
 }
@@ -486,6 +577,20 @@ void AstAnalyser::visit(AccessExpr& node){
         }
     }
     err(node, "Field not found in struct");
+}
+
+void AstAnalyser::visit(SizeofExpr& node){
+    if(node.expr) node.expr->accept(*this);   // only for the type, not evaluated
+    curType = &intType;
+    node.resultType = curType->clone();
+}
+
+void AstAnalyser::visit(TypeidExpr& node){
+    node.expr->accept(*this);
+    auto pt = std::make_unique<PointerType>(charType.clone());
+    curType = pt.get();
+    node.resultType = pt->clone();
+    ptrTypes.push_back(std::move(pt));
 }
 
 

@@ -50,20 +50,7 @@ std::vector<Token> Lexer::tokenize(){
 }
 
 Token Lexer::extract(){
-    if(peek() == '/' && pos + 1 < len){
-        if(raw[pos+1] == '/'){
-            while(!is_end() && peek() != '\n') ++pos;
-            return extract();
-        }
-        if(raw[pos+1] == '*'){
-            pos += 2;
-            while(!is_end() && !(peek() == '*' && pos+1 < len && raw[pos+1] == '/')) ++pos;
-            if(!is_end()) pos += 2;
-            return extract();
-        }
-    }
-
-    while(!is_end() && std::isspace(static_cast<unsigned char>(peek()))) ++pos;
+    skip();   // whitespace and comments, in any order
     if(is_end()){
         return Token{TokenKind::Eof, {}, pos};
     }

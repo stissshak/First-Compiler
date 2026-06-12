@@ -21,12 +21,17 @@ and `src/`:
 
 | Stage | Files | Status |
 |-------|-------|--------|
-| Preprocessor | `Preprocessor.{hpp,cpp}` | `#include "..."`, basic `#define` / `#ifdef` |
-| Lexer | `Lexer.{hpp,cpp}`, `Token.hpp` | all operators, int/double literals |
-| Parser | `Parser.{hpp,cpp}`, `Ast.hpp` | decls, statements, expressions |
-| Analyser | `AstAnalyser.{hpp,cpp}`, `Types.hpp` | symbol table / scopes; type checking WIP |
-| CodeGenerator | `CodeGenerator.{hpp,cpp}` | functions, frames, params — expressions WIP |
-| Diagnostics | `Logger.hpp`, `SourceMap.hpp`, `Input.{hpp,cpp}` | source-mapped messages |
+| Preprocessor | `Preprocessor.{hpp,cpp}` | `#include "..."` with source mapping |
+| Lexer | `Lexer.{hpp,cpp}`, `Token.hpp` | all operators, literals, comments |
+| Parser | `Parser.{hpp,cpp}`, `Ast.hpp` | decls, statements, expressions, typedef, structs, function types |
+| Analyser | `AstAnalyser.{hpp,cpp}`, `Types.hpp` | scopes, cast-matrix type checking, init tracking, const |
+| CodeGenerator | `CodeGenerator.{hpp,cpp}` | full SysV codegen: exprs, calls, structs, runtime checks |
+| Diagnostics | `Logger.hpp`, `SourceMap.hpp`, `Input.{hpp,cpp}` | `file:line:col: error:` messages |
+
+The language and the backend are specified in [`specs/`](specs/) — grammar,
+semantics, type system, code generation; sample programs live in
+[`examples/`](examples/), and [`report.md`](report.md) describes the
+architecture and design decisions.
 
 There is also an `AstPrinter` for dumping the parsed AST during development.
 
@@ -38,11 +43,11 @@ SysV ABI (integer args in `rdi, rsi, rdx, rcx, r8, r9`, return in `rax`,
 function's body is accumulated into a string while the frame size is
 discovered, then prologue + body + epilogue are composed in order.
 
-What currently emits: function labels (`global`), prologue/epilogue
-(`push rbp` / `mov rbp, rsp` / aligned `sub rsp` / `leave; ret`), incoming
-parameter spills to the stack frame, local-variable frame layout, and lexical
-shadowing. Expression evaluation, calls, and control flow are next — see the
-roadmap.
+Everything in the base language emits: expressions over sizes 1/2/4/8
+(widen-on-load model), control flow, direct and indirect calls (function
+pointers), structs with C layout, globals, and runtime checks (division by
+zero, array bounds, null dereference) backed by a syscall-only error stub.
+Details in [`specs/codegen.md`](specs/codegen.md).
 
 ## Build
 

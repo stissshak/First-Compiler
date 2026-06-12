@@ -28,10 +28,13 @@ std::string AstPrinter::typeName(Type* type) {
     if (auto* b = dynamic_cast<BuiltinType*>(type)) {
         switch (b->type) {
             case BuiltinTypes::Int:   return "int";
+            case BuiltinTypes::Short: return "short";
+            case BuiltinTypes::Long:  return "long";
             case BuiltinTypes::Float: return "float";
             case BuiltinTypes::Char:  return "char";
             case BuiltinTypes::Void:  return "void";
             case BuiltinTypes::Bool:  return "bool";
+            case BuiltinTypes::Byte:  return "byte";
             case BuiltinTypes::Custom: return std::string{b->name};
         }
     }
@@ -404,6 +407,26 @@ void AstPrinter::visit(AccessExpr& node) {
     printIndent(true);
     enter(true);
     node.object->accept(*this);
+    leave();
+}
+
+void AstPrinter::visit(SizeofExpr& node) {
+    if(node.target){
+        std::cout << "SizeofExpr -> " << typeName(node.target.get()) << "\n";
+        return;
+    }
+    std::cout << "SizeofExpr\n";
+    printIndent(true);
+    enter(true);
+    node.expr->accept(*this);
+    leave();
+}
+
+void AstPrinter::visit(TypeidExpr& node) {
+    std::cout << "TypeidExpr\n";
+    printIndent(true);
+    enter(true);
+    node.expr->accept(*this);
     leave();
 }
 
