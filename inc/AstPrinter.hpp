@@ -42,6 +42,8 @@ private:
     void visit(CastExpr&)        override;
     void visit(IndexExpr&)       override;
     void visit(AccessExpr&)      override;
+    void visit(SizeofExpr&)      override;
+    void visit(TypeidExpr&)      override;
     void visit(IntLiteral&)      override;
     void visit(FloatLiteral&)    override;
     void visit(CharLiteral&)     override;

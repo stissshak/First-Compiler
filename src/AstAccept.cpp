@@ -22,6 +22,8 @@ void CallExpr::accept(AstVisitor& v)        { v.visit(*this); }
 void CastExpr::accept(AstVisitor& v)        { v.visit(*this); }
 void IndexExpr::accept(AstVisitor& v)       { v.visit(*this); }
 void AccessExpr::accept(AstVisitor& v)      { v.visit(*this); }
+void SizeofExpr::accept(AstVisitor& v)      { v.visit(*this); }
+void TypeidExpr::accept(AstVisitor& v)      { v.visit(*this); }
 void IntLiteral::accept(AstVisitor& v)      { v.visit(*this); }
 void FloatLiteral::accept(AstVisitor& v)    { v.visit(*this); }
 void CharLiteral::accept(AstVisitor& v)     { v.visit(*this); }

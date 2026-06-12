@@ -8,6 +8,7 @@
 #include "AstVisitor.hpp"
 #include "Ast.hpp"
 #include "SourceMap.hpp"
+#include "Logger.hpp"
 
 struct DeclInfo;
 struct Scope;
@@ -44,6 +45,8 @@ private:
     void visit(CastExpr&)        override;
     void visit(IndexExpr&)       override;
     void visit(AccessExpr&)      override;
+    void visit(SizeofExpr&)      override;
+    void visit(TypeidExpr&)      override;
     void visit(IntLiteral&)      override;
     void visit(FloatLiteral&)    override;
     void visit(CharLiteral&)     override;
@@ -59,6 +62,7 @@ private:
     Type *curType = nullptr, *retType = nullptr;
     bool isInLoop = false;
     int errCount = 0;
+    ConsoleLogger cl;
     const SourceMap& smap;
     const std::string& buffer;
     

@@ -93,6 +93,7 @@ static const std::unordered_map<std::string_view, TokenKind> ops = {
 
 static const std::unordered_map<std::string_view, TokenKind> keys = {
     {"sizeof", TokenKind::Sizeof},
+    {"typeid", TokenKind::Typeid},
     {"typedef", TokenKind::Typedef},
     {"const", TokenKind::Const},
     {"static", TokenKind::Static},

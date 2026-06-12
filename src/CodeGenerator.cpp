@@ -70,6 +70,28 @@ static const char* sseCC(BinaryOp op){
 
 
 
+//----------------------------------------
+// struct layouts, filled by visit(StructDecl) before functions use them
+
+struct StructField{
+    std::string_view name;
+    uint32_t offset;
+    Type* type;   // points into the AST, alive all run
+};
+
+struct StructLayout{
+    uint32_t size = 0, align = 1;
+    std::vector<StructField> fields;
+};
+static std::unordered_map<std::string_view, StructLayout> structLayouts;
+
+static StructLayout* layoutOf(Type* t){
+    auto b = dynamic_cast<BuiltinType*>(t);
+    if(!b || b->type != BuiltinTypes::Custom) return nullptr;
+    auto it = structLayouts.find(b->name);
+    return it == structLayouts.end() ? nullptr : &it->second;
+}
+
 inline uint32_t sizeOf(Type* t){
     if(auto b = dynamic_cast<BuiltinType*>(t)){
         switch(b->type){
@@ -78,7 +100,10 @@ inline uint32_t sizeOf(Type* t){
             case BuiltinTypes::Char:  return 1;
             case BuiltinTypes::Void:  return 0;
             case BuiltinTypes::Bool:  return 1;
-            case BuiltinTypes::Custom: return 0; // TODO: struct size
+            case BuiltinTypes::Custom:{
+                auto l = layoutOf(t);
+                return l ? l->size : 0;
+            }
         }
     }
     if(dynamic_cast<PointerType*>(t)) return 8;
@@ -88,7 +113,8 @@ inline uint32_t sizeOf(Type* t){
 
 inline uint32_t alignOf(Type* t){
     if(auto a = dynamic_cast<ArrayType*>(t)) return alignOf(a->elemType.get());
-    return sizeOf(t) ? sizeOf(t) : 1; 
+    if(auto l = layoutOf(t)) return l->align;
+    return sizeOf(t) ? sizeOf(t) : 1;
 }
 
 static RegClass regClassOf(Type* t){
@@ -151,11 +177,28 @@ Reg CodeGenerator::emitRValue(Expr& e){
 LValue CodeGenerator::emitLValue(Expr& e){
     if(auto* id = dynamic_cast<Identifier*>(&e)){
         VarInfo* v = findVar(id->name);
+        if(!v) return LValue{"[rel " + std::string(id->name) + "]", Reg::rax, false};   // global
         return LValue{memOf(v->rbpOffset), Reg::rax, false};
     }
     if(auto* u = dynamic_cast<UnaryExpr*>(&e); u && u->op == UnaryOp::Deref){
         Reg r = emitRValue(*u->child);
         return LValue{"[" + std::string(regName(r)) + "]", r, true};
+    }
+    if(auto* ax = dynamic_cast<AccessExpr*>(&e)){
+        Reg r;
+        Type* st = ax->object->resultType.get();
+        if(ax->kind == AccessKind::Arrow){
+            r = emitRValue(*ax->object);
+            st = static_cast<PointerType*>(st)->base.get();
+        }else{
+            r = lvalueAddr(*ax->object);
+        }
+        for(auto& f : layoutOf(st)->fields){
+            if(f.name != ax->field) continue;
+            if(f.offset) current.body += "\tadd " + R(r) + ", " + std::to_string(f.offset) + "\n";
+            break;
+        }
+        return LValue{"[" + R(r) + "]", r, true};
     }
     if(auto* ix = dynamic_cast<IndexExpr*>(&e)){
         Reg base = emitBaseAddr(*ix->arr);
@@ -206,6 +249,27 @@ Reg CodeGenerator::loadLValue(const LValue& lv, Type* t){
     return dst;
 }
 
+// address of an lvalue in a reg; when ownsReg the mem is always "[reg]"
+Reg CodeGenerator::lvalueAddr(Expr& e){
+    LValue lv = emitLValue(e);
+    if(lv.ownsReg) return lv.reg;
+    Reg r = alloc();
+    current.body += "\tlea " + R(r) + ", " + lv.mem + "\n";
+    return r;
+}
+
+// raw byte copy, layouts are identical so types don't matter
+void CodeGenerator::emitMemCopy(Reg dst, Reg src, uint32_t sz){
+    Reg t = alloc();
+    for(uint32_t o = 0; o < sz; ){
+        uint32_t step = sz - o >= 8 ? 8 : sz - o >= 4 ? 4 : sz - o >= 2 ? 2 : 1;
+        current.body += "\tmov " + R(t, step) + ", [" + R(src) + " + " + std::to_string(o) + "]\n";
+        current.body += "\tmov [" + R(dst) + " + " + std::to_string(o) + "], " + R(t, step) + "\n";
+        o += step;
+    }
+    freeReg(t);
+}
+
 //----------------------------------------
 // runtime checks: caller emits cmp/test, jccOk jumps over the death path
 // rdi/rsi clobbered only when dying, so live regs are safe
@@ -231,12 +295,61 @@ void CodeGenerator::visit(TranslationUnit& node){
     }
 }
 
+// only top-level decls land here, locals go through emitLocalVar
 void CodeGenerator::visit(VarDecl& node){
-
+    uint32_t s = sizeOf(node.type.get());
+    std::string name(node.name);
+    if(!node.initList.empty()){
+        if(auto at = dynamic_cast<ArrayType*>(node.type.get())){
+            uint32_t es = sizeOf(at->elemType.get());
+            const char* w = es==1 ? "db" : es==2 ? "dw" : es==4 ? "dd" : "dq";
+            dataBuf += name + ": " + w + " ";
+            for(std::size_t i = 0; i < at->size; ++i){
+                long v = 0;   // missing tail is zeroed like in C
+                if(i < node.initList.size()){
+                    if(auto il = dynamic_cast<IntLiteral*>(node.initList[i].get()))   v = il->value;
+                    if(auto chl = dynamic_cast<CharLiteral*>(node.initList[i].get())) v = chl->value;
+                    if(auto bl = dynamic_cast<BoolLiteral*>(node.initList[i].get()))  v = bl->value;
+                }
+                dataBuf += std::to_string(v) + (i + 1 < at->size ? ", " : "\n");
+            }
+        }
+        // TODO global struct literal
+        return;
+    }
+    if(!node.init){
+        bssBuf += name + ": resb " + std::to_string(s) + "\n";
+        return;
+    }
+    const char* word = s==1 ? "db" : s==2 ? "dw" : s==4 ? "dd" : "dq";
+    if(auto il = dynamic_cast<IntLiteral*>(node.init.get()))
+        dataBuf += name + ": " + word + " " + std::to_string(il->value) + "\n";
+    else if(auto chl = dynamic_cast<CharLiteral*>(node.init.get()))
+        dataBuf += name + ": " + word + " " + std::to_string((int)chl->value) + "\n";
+    else if(auto bl = dynamic_cast<BoolLiteral*>(node.init.get()))
+        dataBuf += name + ": " + word + " " + std::to_string(bl->value ? 1 : 0) + "\n";
+    else if(auto fl = dynamic_cast<FloatLiteral*>(node.init.get())){
+        uint64_t bits;
+        std::memcpy(&bits, &fl->value, sizeof bits);
+        char buf[24];
+        std::snprintf(buf, sizeof buf, "0x%016llX", (unsigned long long)bits);
+        dataBuf += name + ": dq " + buf + " ; " + std::to_string(fl->value) + "\n";
+    }
+    // TODO non-literal global init
 }
 
 void CodeGenerator::visit(StructDecl& node){
-
+    StructLayout l;
+    for(auto& f : node.fields){
+        uint32_t s = sizeOf(f->type.get());
+        uint32_t a = alignOf(f->type.get());
+        l.align = std::max(l.align, a);
+        l.size = (l.size + a - 1) & ~(a - 1);            // pad to field align
+        l.fields.push_back({f->name, l.size, f->type.get()});
+        l.size += s;
+    }
+    l.size = (l.size + l.align - 1) & ~(l.align - 1);    // tail padding
+    structLayouts[node.name] = l;
 }
 
 static void initFreeRegs(FuncInfo& f){
@@ -400,7 +513,32 @@ void CodeGenerator::emitLocalVar(VarDecl& vd){
     int32_t off = -(int32_t)current.frameSize; 
     current.vars.push_back(VarInfo{ vd.name, s, a, Storage::Stack, {} });
     current.vars.back().rbpOffset = off;
+    if(!vd.initList.empty()){
+        if(auto at = dynamic_cast<ArrayType*>(vd.type.get())){
+            uint32_t esz = sizeOf(at->elemType.get());
+            for(std::size_t i = 0; i < vd.initList.size(); ++i){
+                Reg r = emitRValue(*vd.initList[i]);
+                emitStore(memOf(off + (int32_t)(i * esz)), r, at->elemType.get());
+                freeReg(r);
+            }
+        }else if(auto l = layoutOf(vd.type.get())){
+            for(std::size_t i = 0; i < vd.initList.size(); ++i){
+                Reg r = emitRValue(*vd.initList[i]);
+                emitStore(memOf(off + (int32_t)l->fields[i].offset), r, l->fields[i].type);
+                freeReg(r);
+            }
+        }
+        return;
+    }
     if(vd.init){
+        if(auto l = layoutOf(vd.type.get())){
+            Reg dst = alloc();
+            current.body += "\tlea " + R(dst) + ", " + memOf(off) + "\n";
+            Reg src = lvalueAddr(*vd.init);
+            emitMemCopy(dst, src, l->size);
+            freeReg(dst); freeReg(src);
+            return;
+        }
         Reg r = emitRValue(*vd.init);
         emitStore(memOf(off), r, vd.type.get());
         freeReg(r);
@@ -423,6 +561,15 @@ inline bool isAssign(BinaryOp op)    { return op >= BinaryOp::Assign; }
 
 void CodeGenerator::visit(BinaryExpr& node){
     if(isAssign(node.op)){
+        // struct = struct is a byte copy, not a load
+        if(auto l = layoutOf(node.left->resultType.get())){
+            Reg dst = lvalueAddr(*node.left);
+            Reg src = lvalueAddr(*node.right);
+            emitMemCopy(dst, src, l->size);
+            freeReg(src);
+            resultReg = dst;
+            return;
+        }
         LValue lv = emitLValue(*node.left);
         Reg r = emitRValue(*node.right);
         Type* lt = node.left->resultType.get();
@@ -560,33 +707,69 @@ void CodeGenerator::visit(CallExpr& node){
     std::string name = std::string(id->name);
     std::size_t n = node.param.size();
 
-
-    std::vector<Reg> spill = current.inUse;                
+    // everything live is caller-saved here
+    std::vector<Reg> spill = current.inUse;
     for(Reg r : spill) current.body += "\tpush " + std::string(regName(r)) + "\n";
-    bool pad = (spill.size() % 2) != 0;                     
-    if(pad) current.body += "\tsub rsp, 8\n";
+    std::vector<Reg> spillX = current.inUseXmm;
+    for(Reg r : spillX) current.body += "\tsub rsp, 8\n\tmovsd [rsp], " + R(r) + "\n";
+    current.pushDepth += spill.size() + spillX.size();
 
-
+    // evaluate args into temp slots, arg i ends at [rsp + 8*(n-1-i)]
+    std::vector<RegClass> cls(n);
     for(std::size_t i = 0; i < n; ++i){
+        cls[i] = regClassOf(node.param[i]->resultType.get());
         Reg r = emitRValue(*node.param[i]);
-        current.body += "\tpush " + std::string(regName(r)) + "\n";
+        current.body += "\tsub rsp, 8\n";
+        ++current.pushDepth;
+        if(cls[i] == RegClass::Sse) current.body += "\tmovsd [rsp], " + R(r) + "\n";
+        else                        current.body += "\tmov [rsp], " + R(r) + "\n";
         freeReg(r);
     }
-    for(std::size_t i = n; i-- > 0; )
-        current.body += "\tpop " + std::string(regName(argReg[i])) + "\n";
 
-    current.body += "\txor eax, eax\n";
+    // ints to rdi..r9, floats to xmm0..7, the rest stays for the stack
+    std::size_t gp = 0, sse = 0;
+    std::vector<std::size_t> onStack;
+    for(std::size_t i = 0; i < n; ++i){
+        std::string slot = "[rsp + " + std::to_string(8*(n-1-i)) + "]";
+        if(cls[i] == RegClass::Sse){
+            if(sse < 8) current.body += "\tmovsd xmm" + std::to_string(sse++) + ", " + slot + "\n";
+            else onStack.push_back(i);
+        }else{
+            if(gp < 6) current.body += "\tmov " + std::string(regName(argReg[gp++])) + ", " + slot + "\n";
+            else onStack.push_back(i);
+        }
+    }
+
+    // rsp must be 16-aligned at call
+    bool fill = ((current.pushDepth + onStack.size()) % 2) != 0;
+    if(fill){ current.body += "\tsub rsp, 8\n"; ++current.pushDepth; }
+
+    // stack args in reverse, 7th arg lands at [rsp]; offsets shift as we push
+    std::size_t sh = fill ? 1 : 0;
+    for(std::size_t k = onStack.size(); k-- > 0; ){
+        std::size_t i = onStack[k];
+        current.body += "\tpush qword [rsp + " + std::to_string(8*(n-1-i + sh)) + "]\n";
+        ++sh; ++current.pushDepth;
+    }
+
+    current.body += "\tmov eax, " + std::to_string(sse) + "\n";   // varargs: al = sse args
     current.body += "\tcall " + name + "\n";
     current.hasCall = true;
 
-    if(pad) current.body += "\tadd rsp, 8\n";
+    std::size_t cleanup = n + onStack.size() + (fill ? 1 : 0);
+    if(cleanup) current.body += "\tadd rsp, " + std::to_string(8*cleanup) + "\n";
+    current.pushDepth -= cleanup;
+
+    for(std::size_t i = spillX.size(); i-- > 0; )
+        current.body += "\tmovsd " + R(spillX[i]) + ", [rsp]\n\tadd rsp, 8\n";
     for(std::size_t i = spill.size(); i-- > 0; )
         current.body += "\tpop " + std::string(regName(spill[i])) + "\n";
+    current.pushDepth -= spill.size() + spillX.size();
 
     Reg res = alloc(regClassOf(node.resultType.get()));
-    current.body += "\tmov " + std::string(regName(res)) + ", rax\n";
+    if(isXmm(res)) current.body += "\tmovsd " + R(res) + ", xmm0\n";
+    else           current.body += "\tmov " + R(res) + ", rax\n";
     resultReg = res;
-
 }
 
 void CodeGenerator::visit(CastExpr& node){
@@ -632,7 +815,7 @@ void CodeGenerator::visit(IndexExpr& node){
 }
 
 void CodeGenerator::visit(AccessExpr& node){
-
+    resultReg = loadLValue(emitLValue(node), node.resultType.get());
 }
 
 void CodeGenerator::visit(IntLiteral& node){

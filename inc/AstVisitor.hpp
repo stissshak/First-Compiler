@@ -8,7 +8,7 @@ struct BlockStmt; struct ExprStmt; struct IfStmt;
 struct WhileStmt; struct ForStmt; struct ReturnStmt;
 struct BreakStmt; struct ContinueStmt; struct DeclStmt;
 struct BinaryExpr; struct UnaryExpr; struct CallExpr; struct CastExpr;
-struct IndexExpr; struct AccessExpr;
+struct IndexExpr; struct AccessExpr; struct SizeofExpr; struct TypeidExpr;
 struct IntLiteral; struct FloatLiteral; struct CharLiteral; struct BoolLiteral; struct StringLiteral;
 struct Identifier;
 struct BuiltinType; struct PointerType; struct ArrayType; struct FuncType;
@@ -37,6 +37,8 @@ struct AstVisitor{
     virtual void visit(CastExpr&) = 0;
     virtual void visit(IndexExpr&) = 0;
     virtual void visit(AccessExpr&) = 0;
+    virtual void visit(SizeofExpr&) = 0;
+    virtual void visit(TypeidExpr&) = 0;
     virtual void visit(IntLiteral&) = 0;
     virtual void visit(FloatLiteral&) = 0;
     virtual void visit(CharLiteral&) = 0;

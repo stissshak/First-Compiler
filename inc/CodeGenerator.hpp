@@ -52,6 +52,7 @@ struct FuncInfo{
     std::string name;
     std::string body;
     uint32_t frameSize = 0;
+    std::size_t pushDepth = 0;   // qwords pushed past the frame, for call alignment
     bool hasCall = false;
     std::vector<Reg> freeRegs;
     std::vector<Reg> inUse;
@@ -78,6 +79,8 @@ private:
     void emitLoad(Reg dst, const std::string& mem, Type* t);
     void emitStore(const std::string& mem, Reg src, Type* t);
     Reg loadLValue(const LValue& lv, Type* t);
+    Reg lvalueAddr(Expr& e);
+    void emitMemCopy(Reg dst, Reg src, uint32_t sz);
     void emitRtCheck(const std::string& jccOk, std::string_view msg, std::size_t off);
     static std::string memOf(int32_t off){ return "[rbp" + std::to_string(off) + "]"; }
     std::string newLabel(const std::string& tag){ return ".L" + tag + std::to_string(labelId++); }
@@ -106,6 +109,8 @@ private:
     void visit(CastExpr&)        override;
     void visit(IndexExpr&)       override;
     void visit(AccessExpr&)      override;
+    void visit(SizeofExpr&)      override;
+    void visit(TypeidExpr&)      override;
     void visit(IntLiteral&)      override;
     void visit(FloatLiteral&)    override;
     void visit(CharLiteral&)     override;

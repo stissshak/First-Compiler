@@ -42,7 +42,9 @@ struct VarDecl : Decl{
 	std::unique_ptr<Type> type;
 	std::string_view name;
 	std::unique_ptr<Expr> init;
-	
+	std::vector<std::unique_ptr<Expr>> initList;   // = {a, b, c}
+	bool isConst = false;
+
 	ACCEPT
 };
 
@@ -174,6 +176,19 @@ struct AccessExpr : Expr{
 	std::unique_ptr<Expr> object;
 	std::string_view field;
 	AccessKind kind; 
+
+	ACCEPT
+};
+
+struct SizeofExpr : Expr{
+	std::unique_ptr<Type> target;   // sizeof(type) or sizeof(expr), one is set
+	std::unique_ptr<Expr> expr;
+
+	ACCEPT
+};
+
+struct TypeidExpr : Expr{
+	std::unique_ptr<Expr> expr;
 
 	ACCEPT
 };

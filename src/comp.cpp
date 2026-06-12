@@ -28,7 +28,7 @@ int main(int argc, char *argv[]){
             if(++i == argc) return usage();
             out = argv[i];
         }
-        if(a == "-e"){
+        else if(a == "-e"){
             executable = true;
         }
         else if(a == "--dump-tokens") dumpTokens = true;

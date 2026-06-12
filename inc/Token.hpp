@@ -66,6 +66,7 @@ enum class TokenKind{
 
 
     Sizeof,
+    Typeid,
     Typedef,
     Const,
     Static,

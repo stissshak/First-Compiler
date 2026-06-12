@@ -5,14 +5,11 @@
 #include <optional>
 
 #include "AstAnalyser.hpp"
-#include "Logger.hpp"
-
-
-ConsoleLogger cl;
 
 struct varInfo{
     Type* varType;
     bool inited;
+    bool isConst = false;
 };
 
 
@@ -34,13 +31,19 @@ struct Scope{
     std::unordered_map<std::string_view, DeclInfo> symbols;
 };
 
-static void markInited(Scope* s, std::string_view name){
+strctInfo* lookupStruct(std::string_view name, Scope* curScope);
+
+static varInfo* lookupVar(Scope* s, std::string_view name){
     for(; s; s = s->parent){
         auto it = s->symbols.find(name);
         if(it == s->symbols.end()) continue;
-        if(auto v = std::get_if<varInfo>(&it->second.info)) v->inited = true;
-        return;
+        return std::get_if<varInfo>(&it->second.info);
     }
+    return nullptr;
+}
+
+static void markInited(Scope* s, std::string_view name){
+    if(auto v = lookupVar(s, name)) v->inited = true;
 }
 
 void AstAnalyser::err(std::string_view msg){
@@ -103,12 +106,41 @@ void AstAnalyser::visit(VarDecl& node){
         return;
     }
 
-    bool inited = node.init != nullptr || dynamic_cast<ArrayType*>(node.type.get());
-    DeclInfo di = {varInfo{node.type.get(), inited}};
+    if(node.isConst && !node.init && node.initList.empty()){
+        err(node, "Const var must be initialized");
+        return;
+    }
+
+    auto bt = dynamic_cast<BuiltinType*>(node.type.get());
+    bool inited = node.init != nullptr
+        || dynamic_cast<ArrayType*>(node.type.get())
+        || (bt && bt->type == BuiltinTypes::Custom);   // structs fill field by field
+    DeclInfo di = {varInfo{node.type.get(), inited, node.isConst}};
 
     if(node.init){
         node.init->accept(*this);
         checkTypes(node.type.get(), curType, node, "Incompatible types in initialization");
+    }
+
+    if(!node.initList.empty()){
+        if(auto at = dynamic_cast<ArrayType*>(node.type.get())){
+            if(node.initList.size() > at->size) err(node, "Too many initializers");
+            for(auto& e : node.initList){
+                e->accept(*this);
+                checkTypes(at->elemType.get(), curType, *e, "Incompatible type in initializer");
+            }
+        }
+        else if(bt && bt->type == BuiltinTypes::Custom){
+            auto si = lookupStruct(bt->name, curScope);
+            if(!si) err(node, "Struct type not found");
+            else if(node.initList.size() > si->fields.size()) err(node, "Too many initializers");
+            else for(std::size_t i = 0; i < node.initList.size(); ++i){
+                node.initList[i]->accept(*this);
+                checkTypes(std::get<varInfo>(si->fields[i].second.info).varType, curType,
+                           *node.initList[i], "Incompatible type in initializer");
+            }
+        }
+        else err(node, "Init list on scalar type");
     }
 
     curScope->symbols.emplace(node.name, di);
@@ -205,7 +237,7 @@ void AstAnalyser::visit(BlockStmt& node){
 
 
 void AstAnalyser::visit(ExprStmt& node){
-    node.expr->accept(*this);
+    if(node.expr) node.expr->accept(*this);   // null stmt
 }
 
 // TODO cond -> bool
@@ -272,10 +304,12 @@ void AstAnalyser::visit(DeclStmt& node){
 
 // Change assign, from binary to other AST node
 void AstAnalyser::visit(BinaryExpr& node){
-    // before visiting left, otherwise the target itself errors
-    if(node.op == BinaryOp::Assign){
+    if(node.op >= BinaryOp::Assign){
         if(auto id = dynamic_cast<Identifier*>(node.left.get())){
-            markInited(curScope, id->name);
+            if(auto v = lookupVar(curScope, id->name); v && v->isConst)
+                err(node, "Assign to const var");
+            // before visiting left, otherwise the target itself errors
+            if(node.op == BinaryOp::Assign) markInited(curScope, id->name);
         }
     }
 

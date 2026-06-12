@@ -4,6 +4,7 @@
 
 #include <vector>
 #include <string>
+#include <unordered_map>
 
 #include "Token.hpp"
 #include "Ast.hpp"
@@ -58,4 +59,5 @@ private:
     const std::string& buffer;
 
 	std::vector<std::string_view> userTypes;
+	std::unordered_map<std::string_view, std::unique_ptr<Type>> aliases;   // typedef, parse-time only
 };
