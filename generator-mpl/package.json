@@ -1,0 +1,46 @@
+{
+  "name": "generator-mpl",
+  "version": "0.1.0",
+  "description": "Yeoman generator that scaffolds a new MPL project ready to build with the First-Compiler toolchain",
+  "homepage": "https://github.com/stissshak/First-Compiler",
+  "author": {
+    "name": "stissshak",
+    "email": "stishak.oleg@gmail.com",
+    "url": "https://github.com/stissshak"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/stissshak/First-Compiler.git",
+    "directory": "generator-mpl"
+  },
+  "bugs": {
+    "url": "https://github.com/stissshak/First-Compiler/issues"
+  },
+  "main": "generators/app/index.js",
+  "files": [
+    "generators"
+  ],
+  "keywords": [
+    "yeoman-generator",
+    "mpl",
+    "compiler",
+    "scaffold",
+    "first-compiler"
+  ],
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "dependencies": {
+    "chalk": "^4.1.2",
+    "yeoman-generator": "^5.9.0",
+    "yosay": "^2.0.2"
+  },
+  "devDependencies": {
+    "yeoman-assert": "^3.1.1",
+    "yeoman-test": "^6.3.0"
+  },
+  "scripts": {
+    "test": "yeoman-test"
+  }
+}

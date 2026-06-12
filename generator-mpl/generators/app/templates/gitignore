@@ -1,0 +1,4 @@
+# MPL build artifacts (produced next to sources by `comp -e`)
+*.asm
+*.o
+*.exe

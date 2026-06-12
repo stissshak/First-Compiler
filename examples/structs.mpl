@@ -1,5 +1,4 @@
 // Structs: layout with padding, nesting, copy, pointers, ->.
-extern int printf(char *fmt, ...);
 
 struct Point{
     char tag;
@@ -26,8 +25,8 @@ int main(){
     Point *pp = &p;
     pp->x = 11;
 
-    printf("%c p=(%d,%d) q=(%d,%d)\n", p.tag, p.x, p.y, q.x, q.y);
-    printf("ln.b=(%d,%d) sizeof(Point)=%d typeid=%s\n",
+    print("%c p=(%d,%d) q=(%d,%d)\n", p.tag, p.x, p.y, q.x, q.y);
+    print("ln.b=(%d,%d) sizeof(Point)=%d typeid=%s\n",
            ln.b.x, ln.b.y, sizeof(Point), typeid(p));
     return 0;
 }

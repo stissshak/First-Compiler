@@ -1,0 +1,41 @@
+{
+  "name": "mpl",
+  "displayName": "MPL Language",
+  "description": "Syntax highlighting for MPL, a small C-like language (First-Compiler)",
+  "version": "0.1.0",
+  "publisher": "stissshak",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/stissshak/First-Compiler.git",
+    "directory": "mpl-vscode"
+  },
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "mpl",
+        "aliases": [
+          "MPL",
+          "mpl"
+        ],
+        "extensions": [
+          ".mpl"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "mpl",
+        "scopeName": "source.mpl",
+        "path": "./syntaxes/mpl.tmLanguage.json"
+      }
+    ]
+  }
+}
