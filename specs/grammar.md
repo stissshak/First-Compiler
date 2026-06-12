@@ -15,7 +15,7 @@ is otherwise ignored.
 
 ```
 // line comment, to the end of line
-/* block comment, no nesting */
+/* block comment /* may nest */ to any depth */
 ```
 
 Comments are removed before tokenization and have no semantic effect.

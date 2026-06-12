@@ -32,8 +32,12 @@ void Lexer::skip(){
         }
         if(peek() == '/' && pos+1 < len && raw[pos+1] == '*'){
             pos += 2;
-            while(!is_end() && !(peek() == '*' && pos+1 < len && raw[pos+1] == '/')) ++pos;
-            if(!is_end()) pos += 2;
+            int depth = 1;   // /* */ nest
+            while(!is_end() && depth){
+                if(peek() == '/' && pos+1 < len && raw[pos+1] == '*'){ depth++; pos += 2; }
+                else if(peek() == '*' && pos+1 < len && raw[pos+1] == '/'){ depth--; pos += 2; }
+                else ++pos;
+            }
             continue;
         }
         break;
@@ -50,7 +54,7 @@ std::vector<Token> Lexer::tokenize(){
 }
 
 Token Lexer::extract(){
-    skip();   // whitespace and comments, in any order
+    skip();   // whitespace + comments
     if(is_end()){
         return Token{TokenKind::Eof, {}, pos};
     }

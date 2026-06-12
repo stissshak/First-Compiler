@@ -6,6 +6,7 @@
 tmp/
 obj/
 bin/
+rofl/
 
 *.asm
 *.o

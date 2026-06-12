@@ -113,6 +113,7 @@ static const std::unordered_map<std::string_view, TokenKind> keys = {
 
     {"true", TokenKind::True},
     {"false", TokenKind::False},
+    {"null", TokenKind::Null},
 
     {"int", TokenKind::IntK},
     {"float", TokenKind::FloatK},

@@ -55,6 +55,11 @@ std::string AstPrinter::binaryOpName(BinaryOp op) {
         case BinaryOp::Mul:          return "*";
         case BinaryOp::Div:          return "/";
         case BinaryOp::Mod:          return "%";
+        case BinaryOp::BitOr:        return "|";
+        case BinaryOp::BitAnd:       return "&";
+        case BinaryOp::BitXor:       return "^";
+        case BinaryOp::Shl:          return "<<";
+        case BinaryOp::Shr:          return ">>";
         case BinaryOp::Less:         return "<";
         case BinaryOp::Greater:      return ">";
         case BinaryOp::LessEqual:    return "<=";
@@ -66,6 +71,14 @@ std::string AstPrinter::binaryOpName(BinaryOp op) {
         case BinaryOp::Assign:       return "=";
         case BinaryOp::AddAssign:    return "+=";
         case BinaryOp::MinusAssign:  return "-=";
+        case BinaryOp::MulAssign:    return "*=";
+        case BinaryOp::DivAssign:    return "/=";
+        case BinaryOp::ModAssign:    return "%=";
+        case BinaryOp::BitOrAssign:  return "|=";
+        case BinaryOp::BitAndAssign: return "&=";
+        case BinaryOp::BitXorAssign: return "^=";
+        case BinaryOp::ShlAssign:    return "<<=";
+        case BinaryOp::ShrAssign:    return ">>=";
     }
     return "?";
 }
@@ -77,6 +90,7 @@ std::string AstPrinter::unaryOpName(UnaryOp op) {
         case UnaryOp::Not:       return "!";
         case UnaryOp::AddressOf: return "&";
         case UnaryOp::Deref:     return "*";
+        case UnaryOp::BitNot:    return "!";
         case UnaryOp::PreInc:    return "++ (pre)";
         case UnaryOp::PreDec:    return "-- (pre)";
         case UnaryOp::PostInc:   return "++ (post)";
@@ -445,6 +459,10 @@ void AstPrinter::visit(CharLiteral& node) {
 
 void AstPrinter::visit(BoolLiteral& node) {
     std::cout << "BoolLiteral " << node.value << "\n";
+}
+
+void AstPrinter::visit(NullLiteral&) {
+    std::cout << "NullLiteral\n";
 }
 
 void AstPrinter::visit(StringLiteral& node) {

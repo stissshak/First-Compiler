@@ -52,6 +52,7 @@ private:
     void visit(FloatLiteral&)    override;
     void visit(CharLiteral&)     override;
     void visit(BoolLiteral&)     override;
+    void visit(NullLiteral&)     override;
     void visit(StringLiteral&)   override;
     void visit(Identifier&)      override;
     void visit(BuiltinType&)     override;

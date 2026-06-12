@@ -54,7 +54,7 @@ struct FuncDecl : Decl{
 	std::vector<std::unique_ptr<VarDecl>> params;
 	std::unique_ptr<Stmt> body;
 	bool variadic = false;
-	bool isExtern = false;   // resolved at link time, may stay undefined
+	bool isExtern = false;
 
 	ACCEPT
 };
@@ -182,7 +182,7 @@ struct AccessExpr : Expr{
 };
 
 struct SizeofExpr : Expr{
-	std::unique_ptr<Type> target;   // sizeof(type) or sizeof(expr), one is set
+	std::unique_ptr<Type> target;   // type or expr
 	std::unique_ptr<Expr> expr;
 
 	ACCEPT
@@ -231,6 +231,10 @@ struct BoolLiteral : Expr{
 	ACCEPT
 };
 
+struct NullLiteral : Expr{   // void* 0
+	ACCEPT
+};
+
 struct Identifier : Expr{
 	std::string_view name;
 
@@ -259,7 +263,7 @@ struct BuiltinType : Type{
 
 struct PointerType : Type{
 	std::unique_ptr<Type> base;
-	bool constBase = false;   // const int* — no stores through it
+	bool constBase = false;   // const int*
 	PointerType(std::unique_ptr<Type> b = nullptr) : base(std::move(b)) {}
 
 	std::unique_ptr<Type> clone() const override{

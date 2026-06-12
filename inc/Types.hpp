@@ -15,23 +15,23 @@ enum class castResult{
 
 inline const castResult castMatrix[8][8] = {
 //	         int                   float                 char                  void               custom             ptr                bool                  byte
-/* int  */	{castResult::Equal,    castResult::Implicit, castResult::Implicit, castResult::No,    castResult::No,    castResult::Warn,  castResult::Implicit, castResult::No},
+/* int  */	{castResult::Equal,    castResult::Implicit, castResult::Implicit, castResult::No,    castResult::No,    castResult::Implicit,  castResult::Implicit, castResult::No},
 /* float */	{castResult::Implicit, castResult::Equal,    castResult::Implicit, castResult::No,    castResult::No,    castResult::No,    castResult::No,       castResult::No},
 /* char */	{castResult::Implicit, castResult::Implicit, castResult::Equal,    castResult::No,    castResult::No,    castResult::Warn,  castResult::Implicit, castResult::No},
 /* void */	{castResult::No,       castResult::No,       castResult::No,       castResult::Equal, castResult::No,    castResult::No,    castResult::No,       castResult::No},
 /* cust */	{castResult::No,       castResult::No,       castResult::No,       castResult::No,    castResult::Equal, castResult::No,    castResult::No,       castResult::No},
-/* ptr  */	{castResult::Warn,     castResult::No,       castResult::Warn,     castResult::No,    castResult::No,    castResult::Equal, castResult::No,       castResult::No},
+/* ptr  */	{castResult::Implicit,     castResult::No,       castResult::Warn,     castResult::No,    castResult::No,    castResult::Equal, castResult::No,       castResult::No},
 /* bool */	{castResult::Implicit, castResult::No,       castResult::Implicit, castResult::No,    castResult::No,    castResult::No,    castResult::Equal,    castResult::No},
 /* byte */	{castResult::No,       castResult::No,       castResult::No,       castResult::No,    castResult::No,    castResult::No,    castResult::No,       castResult::Equal},
-};   // byte never converts implicitly, explicit cast handled in CastExpr
+};
 
 inline int typeIndex(Type* t){
     if(auto b = dynamic_cast<BuiltinType*>(t)){
         switch(b->type){
 			case BuiltinTypes::Int:    return 0;
-			case BuiltinTypes::Short:  return 0;   // casts like int, only size differs
+			case BuiltinTypes::Short:  return 0;
 			case BuiltinTypes::Long:   return 0;
-			case BuiltinTypes::UInt:   return 0;   // unsigned-ness lives in codegen
+			case BuiltinTypes::UInt:   return 0;
 			case BuiltinTypes::Float:  return 1;
 			case BuiltinTypes::Char:   return 2;
 			case BuiltinTypes::Void:   return 3;
@@ -52,13 +52,12 @@ inline bool isVoidPtr(const PointerType* pointer){
 }
 
 inline castResult checkCast( Type* from, Type* to){
-    // array decays to pointer like in C, value side only
+    // array decays to pointer
     if(auto arr = dynamic_cast<ArrayType*>(to)){
         PointerType p(arr->elemType->clone());
         return checkCast(from, &p);
     }
 
-    // func types match exactly or not at all
     auto ff = dynamic_cast<FuncType*>(from);
     auto tf = dynamic_cast<FuncType*>(to);
     if(ff || tf){
@@ -90,7 +89,6 @@ inline castResult checkCast( Type* from, Type* to){
     if(fromi == 5 && toi == 5){
         auto fromp = static_cast<PointerType*>(from);
         auto top = static_cast<PointerType*>(to);
-        // from = target, to = actual value; losing const on the way warns
         if(top->constBase && !fromp->constBase) return castResult::Warn;
         if(isVoidPtr(fromp) || isVoidPtr(top)) return castResult::Implicit;
         return checkCast(fromp->base.get(), top->base.get());

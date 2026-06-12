@@ -149,7 +149,7 @@ std::unique_ptr<Type> Parser::parseBaseType() {
 
 std::unique_ptr<Type> Parser::parseType(){
 	auto type = parseBaseType();
-	// func type: int(int, char*); lookahead keeps casts like (int)(x) working
+	// func type: int(int, char*)
 	if(peek().kind == TokenKind::LPar
 			&& (peek(1).kind == TokenKind::RPar || isType(peek(1)))){
 		take();
@@ -275,10 +275,9 @@ std::unique_ptr<Decl> Parser::parseFunction(){
 std::unique_ptr<Decl> Parser::parseVarDecl(){
 	bool leadConst = match(TokenKind::Const);
 	auto type = parseType();
-	bool isConst = match(TokenKind::Const);   // int* const p — the var itself
+	bool isConst = match(TokenKind::Const);   // int* const
 	if(leadConst){
 		if(auto p = dynamic_cast<PointerType*>(type.get())){
-			// const int* p — const belongs to the deepest base
 			PointerType* in = p;
 			while(auto next = dynamic_cast<PointerType*>(in->base.get())) in = next;
 			in->constBase = true;
@@ -798,6 +797,12 @@ std::unique_ptr<Expr> Parser::parsePrimary(){
 			take();
 			auto node = std::make_unique<BoolLiteral>();
 			node->value = false;
+			return node;
+		}
+		case TokenKind::Null:
+		{
+			take();
+			auto node = std::make_unique<NullLiteral>();
 			return node;
 		}
 		case TokenKind::String:

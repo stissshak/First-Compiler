@@ -34,7 +34,6 @@ protected:
     Level minLevel = Level::Info;
 };
 
-// msg already carries "file:line:col: error:", logger only filters
 class ConsoleLogger : public Logger{
 public:
     void log(Level l, std::string_view msg) override{

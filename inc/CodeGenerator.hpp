@@ -53,7 +53,7 @@ struct FuncInfo{
     std::string name;
     std::string body;
     uint32_t frameSize = 0;
-    std::size_t pushDepth = 0;   // qwords pushed past the frame, for call alignment
+    std::size_t pushDepth = 0;   // for call alignment
     bool hasCall = false;
     std::vector<Reg> freeRegs;
     std::vector<Reg> inUse;
@@ -116,6 +116,7 @@ private:
     void visit(FloatLiteral&)    override;
     void visit(CharLiteral&)     override;
     void visit(BoolLiteral&)     override;
+    void visit(NullLiteral&)     override;
     void visit(StringLiteral&)   override;
     void visit(Identifier&)      override;
     void visit(BuiltinType&)     override;

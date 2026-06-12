@@ -13,6 +13,7 @@ enum class TokenKind{
     String,
     True,
     False,
+    Null,
 
     Plus,       // +
     PlusPlus,   // ++
