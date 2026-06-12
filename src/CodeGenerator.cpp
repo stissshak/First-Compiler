@@ -58,6 +58,20 @@ static const char* intCC(BinaryOp op){
     }
 }
 
+static const char* uintCC(BinaryOp op){
+    switch(op){
+        case BinaryOp::Less: return "setb";   case BinaryOp::Greater:      return "seta";
+        case BinaryOp::LessEqual: return "setbe"; case BinaryOp::GreaterEqual: return "setae";
+        case BinaryOp::Equal: return "sete";  case BinaryOp::NotEqual:     return "setne";
+        default: return "";
+    }
+}
+
+static bool isUnsigned(Type* t){
+    auto b = dynamic_cast<BuiltinType*>(t);
+    return b && b->type == BuiltinTypes::UInt;
+}
+
 static const char* sseCC(BinaryOp op){
     switch(op){
         case BinaryOp::Less: return "setb";   case BinaryOp::Greater:      return "seta";
@@ -96,6 +110,7 @@ inline uint32_t sizeOf(Type* t){
     if(auto b = dynamic_cast<BuiltinType*>(t)){
         switch(b->type){
             case BuiltinTypes::Int:   return 4;
+            case BuiltinTypes::UInt:  return 4;
             case BuiltinTypes::Short: return 2;
             case BuiltinTypes::Long:  return 8;
             case BuiltinTypes::Float: return 8;
@@ -243,6 +258,8 @@ void CodeGenerator::emitLoad(Reg dst, const std::string& mem, Type* t){
     }
     uint32_t s = sizeOf(t);
     if(s == 8) current.body += "\tmov " + R(dst) + ", " + mem + "\n";
+    else if(isUnsigned(t))   // mov r32 zeroes the upper half
+        current.body += "\tmov " + R(dst, 4) + ", " + mem + "\n";
     else current.body += "\tmovsx " + R(dst) + ", " + sizeWord(s) + " " + mem + "\n";
 }
 
@@ -593,18 +610,44 @@ void CodeGenerator::visit(BinaryExpr& node){
         Type* lt = node.left->resultType.get();
         if(node.op == BinaryOp::Assign){
             emitStore(lv.mem, r, lt);
+        }else if(regClassOf(lt) == RegClass::Sse){
+            const char* m = node.op==BinaryOp::AddAssign ? "addsd"
+                : node.op==BinaryOp::MinusAssign ? "subsd"
+                : node.op==BinaryOp::MulAssign ? "mulsd" : "divsd";
+            Reg t = alloc(RegClass::Sse);
+            current.body += "\tmovsd " + R(t) + ", " + lv.mem + "\n";
+            current.body += "\t" + std::string(m) + " " + R(t) + ", " + R(r) + "\n";
+            current.body += "\tmovsd " + lv.mem + ", " + R(t) + "\n";
+            freeReg(t);
         }else{
-            if(regClassOf(lt) == RegClass::Sse){
-                Reg t = alloc(RegClass::Sse);
-                current.body += "\tmovsd " + R(t) + ", " + lv.mem + "\n";
-                current.body += "\t" + std::string(node.op==BinaryOp::AddAssign ? "addsd":"subsd")
-                    + " " + R(t) + ", " + R(r) + "\n";
-                current.body += "\tmovsd " + lv.mem + ", " + R(t) + "\n";
-                freeReg(t);
-            }else{
-                current.body += "\t" + std::string(node.op==BinaryOp::AddAssign ? "add":"sub")
-                    + " " + lv.mem + ", " + R(r, sizeOf(lt)) + "\n";
+            // load-modify-store, same instruction patterns as plain binary ops
+            Reg t = alloc();
+            emitLoad(t, lv.mem, lt);
+            switch(node.op){
+                case BinaryOp::AddAssign:    current.body += "\tadd "  + R(t) + ", " + R(r) + "\n"; break;
+                case BinaryOp::MinusAssign:  current.body += "\tsub "  + R(t) + ", " + R(r) + "\n"; break;
+                case BinaryOp::MulAssign:    current.body += "\timul " + R(t) + ", " + R(r) + "\n"; break;
+                case BinaryOp::BitAndAssign: current.body += "\tand "  + R(t) + ", " + R(r) + "\n"; break;
+                case BinaryOp::BitOrAssign:  current.body += "\tor "   + R(t) + ", " + R(r) + "\n"; break;
+                case BinaryOp::BitXorAssign: current.body += "\txor "  + R(t) + ", " + R(r) + "\n"; break;
+                case BinaryOp::ShlAssign: case BinaryOp::ShrAssign:
+                    current.body += "\tmov rcx, " + R(r) + "\n";
+                    current.body += (node.op==BinaryOp::ShlAssign ? "\tsal "
+                        : isUnsigned(lt) ? "\tshr " : "\tsar ") + R(t) + ", cl\n";
+                    break;
+                case BinaryOp::DivAssign: case BinaryOp::ModAssign:
+                    current.body += "\ttest " + R(r) + ", " + R(r) + "\n";
+                    emitRtCheck("jnz", "division by zero", node.offset);
+                    if(isUnsigned(lt))
+                        current.body += "\tmov rax, " + R(t) + "\n\txor edx, edx\n\tdiv " + R(r) + "\n";
+                    else
+                        current.body += "\tmov rax, " + R(t) + "\n\tcqo\n\tidiv " + R(r) + "\n";
+                    current.body += "\tmov " + R(t) + ", " + (node.op==BinaryOp::DivAssign ? "rax" : "rdx") + "\n";
+                    break;
+                default: break;
             }
+            emitStore(lv.mem, t, lt);
+            freeReg(t);
         }
         if(lv.ownsReg) freeReg(lv.reg);
         resultReg = r;
@@ -636,8 +679,9 @@ void CodeGenerator::visit(BinaryExpr& node){
                 freeReg(l); freeReg(r);
                 resultReg = res;
             }else{
+                bool u = isUnsigned(node.left->resultType.get()) || isUnsigned(node.right->resultType.get());
                 current.body += "\tcmp " + R(l) + ", " + R(r) + "\n";
-                current.body += "\t" + std::string(intCC(node.op)) + " al\n";
+                current.body += "\t" + std::string(u ? uintCC(node.op) : intCC(node.op)) + " al\n";
                 current.body += "\tmovzx " + std::string(regName(l)) + ", al\n";
                 freeReg(r);
                 resultReg = l;
@@ -669,12 +713,16 @@ void CodeGenerator::visit(BinaryExpr& node){
                 case BinaryOp::Shl: case BinaryOp::Shr:
                     // count goes through cl, x86 masks it to 6 bits
                     current.body += "\tmov rcx, " + R(r) + "\n";
-                    current.body += (node.op==BinaryOp::Shl ? "\tsal " : "\tsar ") + R(l) + ", cl\n";
+                    current.body += (node.op==BinaryOp::Shl ? "\tsal "
+                        : isUnsigned(node.left->resultType.get()) ? "\tshr " : "\tsar ") + R(l) + ", cl\n";
                     break;
                 case BinaryOp::Div: case BinaryOp::Mod:
                     current.body += "\ttest " + R(r) + ", " + R(r) + "\n";
                     emitRtCheck("jnz", "division by zero", node.offset);
-                    current.body += "\tmov rax, " + R(l) + "\n\tcqo\n\tidiv " + R(r) + "\n";
+                    if(isUnsigned(node.left->resultType.get()))
+                        current.body += "\tmov rax, " + R(l) + "\n\txor edx, edx\n\tdiv " + R(r) + "\n";
+                    else
+                        current.body += "\tmov rax, " + R(l) + "\n\tcqo\n\tidiv " + R(r) + "\n";
                     current.body += "\tmov " + R(l) + ", " + (node.op==BinaryOp::Div ? "rax" : "rdx") + "\n";
                     break;
                 default: break;
@@ -724,7 +772,26 @@ void CodeGenerator::visit(UnaryExpr& node){
         resultReg = r;
         return;
     }
-    // TODO PreInc PreDec PostInc PostDec
+    // ++/--: load-modify-store; pointers step by element size
+    LValue lv = emitLValue(*node.child);
+    Type* t = node.child->resultType.get();
+    uint32_t step = 1;
+    if(auto p = dynamic_cast<PointerType*>(t)) step = sizeOf(p->base.get());
+    bool inc = node.op == UnaryOp::PreInc || node.op == UnaryOp::PostInc;
+    bool post = node.op == UnaryOp::PostInc || node.op == UnaryOp::PostDec;
+
+    Reg val = alloc();
+    emitLoad(val, lv.mem, t);
+    Reg old = val;
+    if(post){
+        old = alloc();
+        current.body += "\tmov " + R(old) + ", " + R(val) + "\n";
+    }
+    current.body += (inc ? "\tadd " : "\tsub ") + R(val) + ", " + std::to_string(step) + "\n";
+    emitStore(lv.mem, val, t);
+    if(post) freeReg(val);
+    if(lv.ownsReg) freeReg(lv.reg);
+    resultReg = old;
 }
 
 void CodeGenerator::visit(CallExpr& node){
@@ -883,6 +950,7 @@ static std::string typeStr(Type* t){
     if(auto b = dynamic_cast<BuiltinType*>(t)){
         switch(b->type){
             case BuiltinTypes::Int:    return "int";
+            case BuiltinTypes::UInt:   return "uint";
             case BuiltinTypes::Short:  return "short";
             case BuiltinTypes::Long:   return "long";
             case BuiltinTypes::Float:  return "float";

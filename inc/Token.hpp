@@ -98,6 +98,7 @@ enum class TokenKind{
     ByteK,
     ShortK,
     LongK,
+    UIntK,
     
 
     Invalid,

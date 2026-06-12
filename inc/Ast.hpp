@@ -241,7 +241,7 @@ struct Identifier : Expr{
 
 
 enum class BuiltinTypes{
-	Int, Float, Char, Void, Custom, Bool, Byte, Short, Long
+	Int, Float, Char, Void, Custom, Bool, Byte, Short, Long, UInt
 };
 
 struct BuiltinType : Type{

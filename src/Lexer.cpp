@@ -122,6 +122,13 @@ Token Lexer::extract_num(){
     std::size_t start = pos;
     bool dot = false;
 
+    // 0x / 0b prefixes
+    if(peek() == '0' && pos+1 < len && (raw[pos+1] == 'x' || raw[pos+1] == 'b')){
+        pos += 2;
+        while(!is_end() && std::isalnum((unsigned char)peek())) take();
+        return Token{TokenKind::Int, raw.substr(start, pos - start), start};
+    }
+
     while(!is_end()){
         char c = peek();
 

@@ -122,6 +122,7 @@ static const std::unordered_map<std::string_view, TokenKind> keys = {
     {"byte", TokenKind::ByteK},
     {"short", TokenKind::ShortK},
     {"long", TokenKind::LongK},
+    {"uint", TokenKind::UIntK},
 
     {"extern", TokenKind::Extern},
     {"struct", TokenKind::Struct},

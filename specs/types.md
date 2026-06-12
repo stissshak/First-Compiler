@@ -5,6 +5,7 @@
 | Type    | Size (bytes) | Description                                      |
 |---------|--------------|--------------------------------------------------|
 | `int`   | 4            | signed integer, two's complement                 |
+| `uint`  | 4            | unsigned integer                                 |
 | `short` | 2            | signed integer                                   |
 | `long`  | 8            | signed integer                                   |
 | `float` | 8            | IEEE-754 double precision (C's `double`)         |
@@ -13,9 +14,10 @@
 | `byte`  | 1            | raw data, **non-arithmetic** (see §5)            |
 | `void`  | —            | absence of a value; only as return type / `void*`|
 
-Agreed deviations from the base table: there is no `uint` (unsigned types are
-not implemented), `char` is arithmetic, and there is a single float width
-(8 bytes). All integers are signed two's complement; overflow wraps around.
+Agreed deviations from the base table: `char` is arithmetic and there is a
+single float width (8 bytes). Signed integers are two's complement; overflow
+wraps around. `uint` loads zero-extend and use unsigned comparison, division
+and right shift; mixed `int`/`uint` comparisons compare unsigned.
 
 ## 2. Derived types
 
@@ -65,9 +67,9 @@ argument passing and explicit casts.
 | **bool**  | impl  | no    | impl  | no   | no     | no   | =     | no   |
 | **byte**  | no    | no    | no    | no   | no     | no   | no    | =    |
 
-`short` and `long` use the `int` row/column: all `int`/`short`/`long`
-conversions are implicit; only the storage size differs (widening and
-narrowing both allowed; narrowing truncates, see codegen.md §3).
+`short`, `long` and `uint` use the `int` row/column: conversions inside the
+integer family are implicit; only storage size and signedness differ
+(widening and narrowing both allowed; narrowing truncates, see codegen.md §3).
 
 Pointer-to-pointer: implicit if either side is `void*`; otherwise the pointee
 types are compared recursively. Assigning a `const T*` into a plain `T*`

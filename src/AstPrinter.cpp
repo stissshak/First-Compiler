@@ -28,6 +28,7 @@ std::string AstPrinter::typeName(Type* type) {
     if (auto* b = dynamic_cast<BuiltinType*>(type)) {
         switch (b->type) {
             case BuiltinTypes::Int:   return "int";
+            case BuiltinTypes::UInt:  return "uint";
             case BuiltinTypes::Short: return "short";
             case BuiltinTypes::Long:  return "long";
             case BuiltinTypes::Float: return "float";

@@ -25,7 +25,7 @@ Comments are removed before tokenization and have no semantic effect.
 Reserved, cannot be used as identifiers:
 
 ```
-int short long float char bool byte void
+int uint short long float char bool byte void
 struct typedef const extern
 if else while for return break continue
 true false sizeof typeid
@@ -43,7 +43,9 @@ digit      = "0".."9" ;
 ### Literals
 
 ```
-int-literal    = digit , { digit } ;                       (* 64-bit value *)
+int-literal    = digit , { digit }
+               | "0x" , hex-digit , { hex-digit }
+               | "0b" , ( "0" | "1" ) , { "0" | "1" } ;    (* 64-bit value *)
 float-literal  = { digit } , "." , digit , { digit } ;
 char-literal   = "'" , character , "'" ;
 string-literal = '"' , { character | escape } , '"' ;
@@ -59,7 +61,7 @@ literal `char*` (NUL-terminated, placed in read-only memory).
 By precedence, weakest first (see §3):
 
 ```
-=  +=  -=                                 assignment (right-assoc)
+=  +=  -=  *=  /=  %=  &=  |=  ^=  <<=  >>=   assignment (right-assoc)
 ||                                        logical or
 &&                                        logical and
 |   ^   &                                 bitwise or, xor, and
@@ -70,11 +72,8 @@ By precedence, weakest first (see §3):
 *   /   %                                 multiplicative
 ```
 
-Unary: `-  !  ~  &  *  (type)`. Postfix: `()  []  .  ->`.
+Unary: `-  !  ~  &  *  ++  --  (type)`. Postfix: `()  []  .  ->  ++  --`.
 Delimiters: `( ) { } [ ] , ; ...`
-
-Reserved but not yet implemented: `*= /= %= &= |= ^= <<= >>=` (compile-time
-error if used).
 
 ### Preprocessor
 
@@ -162,13 +161,14 @@ except assignment).
 expression  = assignment ;
 assignment  = binary , [ ( "=" | "+=" | "-=" ) , assignment ] ;
 binary      = unary , { binop , unary } ;             (* precedence table *)
-unary       = ( "-" | "!" | "~" | "&" | "*" ) , unary
+unary       = ( "-" | "!" | "~" | "&" | "*" | "++" | "--" ) , unary
             | "(" , type , ")" , unary                (* cast *)
             | postfix ;
 postfix     = primary , { "(" , [ args ] , ")"        (* call *)
                         | "[" , expression , "]"      (* index *)
                         | "." , identifier            (* field *)
-                        | "->" , identifier } ;       (* field via pointer *)
+                        | "->" , identifier           (* field via pointer *)
+                        | "++" | "--" } ;             (* post inc/dec *)
 args        = expression , { "," , expression } ;
 primary     = int-literal | float-literal | char-literal | string-literal
             | bool-literal | identifier

@@ -13,10 +13,15 @@
 
 long long svtoi(std::string_view str){
 	long long res = 0;
-	std::size_t len = str.length();
-	for(std::size_t i = 0; i < len; ++i){
-		res *= 10;
-		res += str[i]  - '0';
+	std::size_t i = 0, base = 10;
+	if(str.size() > 2 && str[0] == '0' && (str[1] == 'x' || str[1] == 'b')){
+		base = str[1] == 'x' ? 16 : 2;
+		i = 2;
+	}
+	for(; i < str.size(); ++i){
+		char c = str[i];
+		long long d = c <= '9' ? c - '0' : (c | 32) - 'a' + 10;   // a-f, A-F
+		res = res * base + d;
 	}
 	return res;
 }
@@ -88,6 +93,7 @@ bool Parser::isType(const Token& t){
 		case TokenKind::ByteK:
 		case TokenKind::ShortK:
 		case TokenKind::LongK:
+		case TokenKind::UIntK:
 			return true;
 		case TokenKind::Identifier:
 			if(std::find(userTypes.begin(), userTypes.end(), t.data) == userTypes.end()){
@@ -125,6 +131,9 @@ std::unique_ptr<Type> Parser::parseBaseType() {
 		case TokenKind::LongK:
 			take();
 			return std::make_unique<BuiltinType>(BuiltinTypes::Long);
+		case TokenKind::UIntK:
+			take();
+			return std::make_unique<BuiltinType>(BuiltinTypes::UInt);
 
 		default:
 			if (peek().kind != TokenKind::Identifier)

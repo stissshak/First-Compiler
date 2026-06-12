@@ -31,6 +31,7 @@ inline int typeIndex(Type* t){
 			case BuiltinTypes::Int:    return 0;
 			case BuiltinTypes::Short:  return 0;   // casts like int, only size differs
 			case BuiltinTypes::Long:   return 0;
+			case BuiltinTypes::UInt:   return 0;   // unsigned-ness lives in codegen
 			case BuiltinTypes::Float:  return 1;
 			case BuiltinTypes::Char:   return 2;
 			case BuiltinTypes::Void:   return 3;

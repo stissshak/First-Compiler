@@ -362,8 +362,6 @@ void AstAnalyser::visit(DeclStmt& node){
 // Change assign, from binary to other AST node
 void AstAnalyser::visit(BinaryExpr& node){
     if(node.op >= BinaryOp::Assign){
-        if(node.op > BinaryOp::MinusAssign)   // TODO *= /= %= and bit-assigns
-            err(node, "This compound assign is not supported yet");
         if(auto id = dynamic_cast<Identifier*>(node.left.get())){
             if(auto v = lookupVar(curScope, id->name); v && v->isConst)
                 err(node, "Assign to const var");
@@ -384,6 +382,14 @@ void AstAnalyser::visit(BinaryExpr& node){
             && node.op != BinaryOp::Assign
             && node.op != BinaryOp::Equal && node.op != BinaryOp::NotEqual)
         err(node, "byte is not arithmetic");
+
+    // floats have no %, bitwise or shift
+    if(auto b = dynamic_cast<BuiltinType*>(lType); b && b->type == BuiltinTypes::Float){
+        bool bad = node.op == BinaryOp::Mod
+            || (node.op >= BinaryOp::BitAnd && node.op <= BinaryOp::Shr)
+            || node.op >= BinaryOp::ModAssign;
+        if(bad) err(node, "Invalid operator for float");
+    }
 
     if(node.op >= BinaryOp::Assign){
         // no stores through const int*
@@ -434,6 +440,20 @@ void AstAnalyser::visit(UnaryExpr& node){
 
     if(isByte(curType) && node.op != UnaryOp::AddressOf)
         err(node, "byte is not arithmetic");
+
+    if(node.op >= UnaryOp::PreInc && node.op <= UnaryOp::PostDec){
+        if(auto b = dynamic_cast<BuiltinType*>(curType); b && b->type == BuiltinTypes::Float)
+            err(node, "++/-- is not supported for float");
+        if(auto id = dynamic_cast<Identifier*>(node.child.get())){
+            if(auto v = lookupVar(curScope, id->name); v && v->isConst)
+                err(node, "Assign to const var");
+        }
+        else if(!dynamic_cast<IndexExpr*>(node.child.get())
+             && !dynamic_cast<AccessExpr*>(node.child.get())){
+            auto u = dynamic_cast<UnaryExpr*>(node.child.get());
+            if(!u || u->op != UnaryOp::Deref) err(node, "++/-- needs an lvalue");
+        }
+    }
 
     switch(node.op){
         case UnaryOp::Pos:
