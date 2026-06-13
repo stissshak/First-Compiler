@@ -38,8 +38,8 @@ There is also an `AstPrinter` for dumping the parsed AST during development.
 ## Code generation
 
 The backend targets **x86-64, NASM syntax** (`nasm -f elf64`), following the
-SysV ABI (integer args in `rdi, rsi, rdx, rcx, r8, r9`, return in `rax`,
-16-byte stack alignment at calls). Emission is a buffered single pass: each
+SysV ABI (integer args in `rdi, rsi, rdx, rcx, r8, r9` and float args in
+`xmm0-7`, return in `rax`/`xmm0`, 16-byte stack alignment at calls). Emission is a buffered single pass: each
 function's body is accumulated into a string while the frame size is
 discovered, then prologue + body + epilogue are composed in order.
 
@@ -61,16 +61,21 @@ make clean
 
 ## Usage
 
-```sh
-bin/comp <input-file> <output.asm>
-```
-
-Then assemble and link the emitted NASM:
+The driver works like `gcc`: by default it compiles, assembles, and links a
+runnable executable.
 
 ```sh
-nasm -f elf64 output.asm -o output.o
-ld output.o -o program          # or: gcc output.o -o program
+bin/comp prog.mpl              # -> a.out
+bin/comp prog.mpl -o prog      # name the executable
+bin/comp prog.mpl -S           # emit assembly only        -> prog.asm
+bin/comp prog.mpl -c           # assemble to an object     -> prog.o
+bin/comp prog.mpl -E           # preprocess only, to stdout
+bin/comp prog.mpl --dump-tokens --dump-ast   # inspect the front end
 ```
+
+Linking shells out to `nasm -felf64` and `gcc -no-pie ... -lm`; intermediate
+`.asm`/`.o` files are written to the temp dir and removed automatically (use
+`-S`/`-c` to keep them).
 
 ## Status & roadmap
 

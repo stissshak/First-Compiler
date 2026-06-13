@@ -21,8 +21,8 @@ all: debug #run
 build: debug
 
 run: $(EXE)
-	./$(EXE) examples/structs.mpl -e
-	@./examples/structs.exe
+	./$(EXE) examples/structs.mpl -o $(BIN_DIR)/structs
+	@$(BIN_DIR)/structs
 
 debug: CFLAGS += -g
 debug: $(EXE)

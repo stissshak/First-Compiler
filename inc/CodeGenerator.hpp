@@ -70,6 +70,11 @@ public:
     }
 
     void generate(TranslationUnit& unit);
+
+    static std::string memOf(int32_t off){               // off>=0 needs explicit '+' for nasm
+        return off < 0 ? "[rbp" + std::to_string(off) + "]"
+                       : "[rbp+" + std::to_string(off) + "]";
+    }
 private:
     Reg resultReg = Reg::rax;
     Reg alloc(RegClass cls = RegClass::Int);
@@ -83,7 +88,6 @@ private:
     Reg lvalueAddr(Expr& e);
     void emitMemCopy(Reg dst, Reg src, uint32_t sz);
     void emitRtCheck(const std::string& jccOk, std::string_view msg, std::size_t off);
-    static std::string memOf(int32_t off){ return "[rbp" + std::to_string(off) + "]"; }
     std::string newLabel(const std::string& tag){ return ".L" + tag + std::to_string(labelId++); }
 
 

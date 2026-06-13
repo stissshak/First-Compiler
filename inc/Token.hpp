@@ -14,6 +14,8 @@ enum class TokenKind{
     True,
     False,
     Null,
+    Inf,        // float +infinity literal
+    Nan,        // float NaN literal
 
     Plus,       // +
     PlusPlus,   // ++

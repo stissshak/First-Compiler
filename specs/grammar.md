@@ -28,7 +28,7 @@ Reserved, cannot be used as identifiers:
 int uint short long float char bool byte void
 struct typedef const extern
 if else while for return break continue
-true false sizeof typeid
+true false null inf nan sizeof typeid
 enum union switch case default     // reserved for future use
 ```
 
@@ -46,15 +46,18 @@ digit      = "0".."9" ;
 int-literal    = digit , { digit }
                | "0x" , hex-digit , { hex-digit }
                | "0b" , ( "0" | "1" ) , { "0" | "1" } ;    (* 64-bit value *)
-float-literal  = { digit } , "." , digit , { digit } ;
+float-literal  = ( { digit } , "." , digit , { digit } ) | "inf" | "nan" ;
 char-literal   = "'" , character , "'" ;
 string-literal = '"' , { character | escape } , '"' ;
 bool-literal   = "true" | "false" ;
-escape         = "\n" | "\t" | "\r" | "\0" | "\\" | '\"' ;
+escape         = "\n" | "\t" | "\r" | "\0" | "\\" | '\"' | "\'"
+               | "\a" | "\b" | "\f" | "\v" | ( "\x" , hex-digit , { hex-digit } ) ;
 ```
 
 The type of an int literal is `int`, of a float literal `float`, of a string
-literal `char*` (NUL-terminated, placed in read-only memory).
+literal `char*` (NUL-terminated, placed in read-only memory). `inf` and `nan`
+are float literals for IEEE-754 positive infinity and NaN; `-inf` is `inf`
+negated. NaN is unordered — see types.md §1.
 
 ### Operators and delimiters
 

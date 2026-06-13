@@ -3,6 +3,7 @@
 #include <unordered_map>
 #include <stack>
 #include <optional>
+#include <cctype>
 
 #include "AstAnalyser.hpp"
 
@@ -37,6 +38,42 @@ strctInfo* lookupStruct(std::string_view name, Scope* curScope);
 static bool isByte(Type* t){
     auto b = dynamic_cast<BuiltinType*>(t);
     return b && b->type == BuiltinTypes::Byte;
+}
+
+static bool isFloatTy(Type* t){
+    auto b = dynamic_cast<BuiltinType*>(t);
+    return b && b->type == BuiltinTypes::Float;
+}
+
+static bool isBoolTy(Type* t){
+    auto b = dynamic_cast<BuiltinType*>(t);
+    return b && b->type == BuiltinTypes::Bool;
+}
+
+static bool isScalar(Type* t){
+    auto b = dynamic_cast<BuiltinType*>(t);
+    if(!b) return false;
+    switch(b->type){
+        case BuiltinTypes::Int:  case BuiltinTypes::Float: case BuiltinTypes::Char:
+        case BuiltinTypes::Bool: case BuiltinTypes::Short: case BuiltinTypes::Long:
+        case BuiltinTypes::UInt: return true;
+        default: return false;
+    }
+}
+
+static void coerce(std::unique_ptr<Expr>& e, Type* to){
+    if(!e || !e->resultType || !to) return;
+    Type* from = e->resultType.get();
+    if(!isScalar(from) || !isScalar(to)) return;
+    bool classChange = isFloatTy(from) != isFloatTy(to);
+    bool normBool    = isBoolTy(to) && !isBoolTy(from);
+    if(!classChange && !normBool) return;
+    auto c = std::make_unique<CastExpr>();
+    c->offset = e->offset;
+    c->target = to->clone();
+    c->resultType = to->clone();
+    c->expr = std::move(e);
+    e = std::move(c);
 }
 
 static varInfo* lookupVar(Scope* s, std::string_view name){
@@ -173,7 +210,27 @@ void AstAnalyser::visit(VarDecl& node){
 
     if(node.init){
         node.init->accept(*this);
-        checkTypes(node.type.get(), curType, node, "Incompatible types in initialization");
+        auto at = dynamic_cast<ArrayType*>(node.type.get());
+        auto sl = dynamic_cast<StringLiteral*>(node.init.get());
+        if(at && sl){                                    // char[] = "literal"
+            auto et = dynamic_cast<BuiltinType*>(at->elemType.get());
+            std::size_t len = 0;                         // decoded length
+            auto& v = sl->value;
+            for(std::size_t i = 0; i < v.size(); ++i){
+                if(v[i]=='\\' && i+1 < v.size()){
+                    if(v[++i]=='x')                          // \xHH...: consume hex digits
+                        while(i+1<v.size() && std::isxdigit((unsigned char)v[i+1])) ++i;
+                }
+                ++len;
+            }
+            if(!et || et->type != BuiltinTypes::Char)
+                err(node, "String literal initializes only a char array");
+            else if(len + 1 > at->size)
+                err(node, "String literal too long for array");
+        }else{
+            checkTypes(node.type.get(), curType, node, "Incompatible types in initialization");
+            if(curScope->parent) coerce(node.init, node.type.get());  // runtime cvt; globals fold statically
+        }
     }
 
     if(!node.initList.empty()){
@@ -182,6 +239,7 @@ void AstAnalyser::visit(VarDecl& node){
             for(auto& e : node.initList){
                 e->accept(*this);
                 checkTypes(at->elemType.get(), curType, *e, "Incompatible type in initializer");
+                if(curScope->parent) coerce(e, at->elemType.get());
             }
         }
         else if(bt && bt->type == BuiltinTypes::Custom){
@@ -190,8 +248,9 @@ void AstAnalyser::visit(VarDecl& node){
             else if(node.initList.size() > si->fields.size()) err(node, "Too many initializers");
             else for(std::size_t i = 0; i < node.initList.size(); ++i){
                 node.initList[i]->accept(*this);
-                checkTypes(std::get<varInfo>(si->fields[i].second.info).varType, curType,
-                           *node.initList[i], "Incompatible type in initializer");
+                Type* ft = std::get<varInfo>(si->fields[i].second.info).varType;
+                checkTypes(ft, curType, *node.initList[i], "Incompatible type in initializer");
+                if(curScope->parent) coerce(node.initList[i], ft);
             }
         }
         else err(node, "Init list on scalar type");
@@ -337,6 +396,7 @@ void AstAnalyser::visit(ReturnStmt& node){
     if(node.value) node.value->accept(*this);
     else curType = &voidType;
     checkTypes(retType, curType, node, "Return type mismatch");
+    if(node.value) coerce(node.value, retType);
 }
 
 
@@ -403,6 +463,14 @@ void AstAnalyser::visit(BinaryExpr& node){
 
     checkTypes(lType, rType, node, "Incompatible types in binary expression");
 
+    Type* common = lType;
+    if(node.op >= BinaryOp::Assign){
+        coerce(node.right, lType);
+    }else if(isFloatTy(lType) != isFloatTy(rType)){
+        common = isFloatTy(lType) ? lType : rType;
+        coerce(node.left, common);
+        coerce(node.right, common);
+    }
 
     switch(node.op){
         case BinaryOp::Less:
@@ -416,8 +484,7 @@ void AstAnalyser::visit(BinaryExpr& node){
             curType = &boolType;
             break;
         default:
-        // TODO common type
-            curType = lType;
+            curType = common;
             break;
     }
     node.resultType = curType->clone();
@@ -514,8 +581,10 @@ void AstAnalyser::visit(CallExpr& node){
         else{
             for(std::size_t i = 0; i < node.param.size(); ++i){
                 node.param[i]->accept(*this);
-                if(i < fType->params.size())
+                if(i < fType->params.size()){
                     checkTypes(fType->params[i].get(), curType, *node.param[i], "Incompatible argument type");
+                    coerce(node.param[i], fType->params[i].get());
+                }
             }
             curType = fType->returnType.get();
         }

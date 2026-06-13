@@ -15,9 +15,15 @@
 | `void`  | —            | absence of a value; only as return type / `void*`|
 
 Agreed deviations from the base table: `char` is arithmetic and there is a
-single float width (8 bytes). Signed integers are two's complement; overflow
-wraps around. `uint` loads zero-extend and use unsigned comparison, division
-and right shift; mixed `int`/`uint` comparisons compare unsigned.
+single float width (8 bytes). `char` and `byte` are **signed**. Signed integers
+are two's complement; overflow wraps around. `uint` loads zero-extend and use
+unsigned comparison, division and right shift; mixed `int`/`uint` comparisons
+compare unsigned.
+
+`float` follows IEEE-754: the literals `inf` and `nan` denote positive infinity
+and NaN (`-inf` is `inf` negated), and division does **not** trap (`1.0/0.0` is
+`inf`, `0.0/0.0` is `nan`). NaN is unordered: `<`, `>`, `<=`, `>=` and `==`
+against a NaN are all false, and `!=` is true (so `nan != nan`).
 
 ## 2. Derived types
 
@@ -79,7 +85,8 @@ Numeric `int`/`char` ↔ pointer conversions produce a warning (needed for
 `(int*)0` etc.).
 
 Float → int truncates toward zero (`cvttsd2si`); int → float is exact for
-values up to 2^53.
+values up to 2^53. Converting any scalar to `bool` normalizes to 0/1 (nonzero
+becomes `1`), so `bool b = 5;` stores `1`.
 
 ## 5. byte
 

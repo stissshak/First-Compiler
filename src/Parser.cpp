@@ -5,6 +5,7 @@
 #include <string_view>
 #include <stdexcept>
 #include <algorithm>
+#include <limits>
 
 #include "Parser.hpp"
 
@@ -772,10 +773,24 @@ std::unique_ptr<Expr> Parser::parsePrimary(){
 			return node;
 		}
 		case TokenKind::Float:
-		{    
+		{
 			take();
 			auto node = std::make_unique<FloatLiteral>();
 			node->value = svtod(tok.data);
+			return node;
+		}
+		case TokenKind::Inf:
+		{
+			take();
+			auto node = std::make_unique<FloatLiteral>();
+			node->value = std::numeric_limits<double>::infinity();
+			return node;
+		}
+		case TokenKind::Nan:
+		{
+			take();
+			auto node = std::make_unique<FloatLiteral>();
+			node->value = std::numeric_limits<double>::quiet_NaN();
 			return node;
 		}
 		case TokenKind::Char:

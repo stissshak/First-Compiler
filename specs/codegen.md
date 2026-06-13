@@ -115,9 +115,20 @@ are harmless and checks cost two instructions each.
 ## 7. Compiler CLI
 
 ```
-comp <file> [-o <out.asm>] [-e] [--dump-tokens] [--dump-ast]
+comp [options] <file.mpl>
+  -o <file>      place the output in <file>
+  -S             emit assembly only (.asm), do not assemble
+  -c             assemble to an object file (.o), do not link
+  -E             preprocess only, write to stdout (or -o)
+  --dump-tokens  dump the token stream
+  --dump-ast     dump the parsed AST
+  -h, --help     show this help
 ```
 
-Without `-o` the output name is the input with the `.asm` extension. `-e`
-additionally assembles and links into an executable. The dump flags print the
-token stream / AST for debugging.
+The driver mirrors `gcc`. With none of `-S`/`-c`/`-E` it compiles, assembles
+(`nasm -felf64`) and links (`gcc -no-pie ... -lm`) a runnable executable,
+defaulting to `a.out`. `-S`/`-c`/`-E` stop after the assembly / object /
+preprocess stage; their default output names are the input stem with the
+matching extension. Intermediate files for the full pipeline go to the temp
+dir and are removed automatically. The dump flags print the token stream / AST
+for debugging.

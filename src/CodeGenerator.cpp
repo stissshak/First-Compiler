@@ -72,14 +72,6 @@ static bool isUnsigned(Type* t){
     return b && b->type == BuiltinTypes::UInt;
 }
 
-static const char* sseCC(BinaryOp op){
-    switch(op){
-        case BinaryOp::Less: return "setb";   case BinaryOp::Greater:      return "seta";
-        case BinaryOp::LessEqual: return "setbe"; case BinaryOp::GreaterEqual: return "setae";
-        case BinaryOp::Equal: return "sete";  case BinaryOp::NotEqual:     return "setne";
-        default: return "";
-    }
-}
 
 
 
@@ -285,6 +277,33 @@ Reg CodeGenerator::lvalueAddr(Expr& e){
     return r;
 }
 
+static int hexVal(char c){
+    if(c>='0'&&c<='9') return c-'0';
+    if(c>='a'&&c<='f') return c-'a'+10;
+    if(c>='A'&&c<='F') return c-'A'+10;
+    return -1;
+}
+
+// decode a string literal's escapes into raw bytes, trailing nul included
+static std::vector<uint8_t> decodeStr(std::string_view s){
+    std::vector<uint8_t> out;
+    for(std::size_t i = 0; i < s.size(); ++i){
+        if(s[i]=='\\' && i+1<s.size()){
+            char n = s[++i];
+            if(n=='x'){                                  // \xHH... hex escape
+                int v = 0, d;
+                while(i+1<s.size() && (d=hexVal(s[i+1]))>=0){ v = v*16 + d; ++i; }
+                out.push_back((uint8_t)v);
+            }else out.push_back(
+                n=='n'?10 : n=='t'?9  : n=='r'?13 : n=='0'?0
+              : n=='a'?7  : n=='b'?8  : n=='f'?12 : n=='v'?11
+              : (uint8_t)n);                             // \\ \" \' etc: literal
+        } else out.push_back((uint8_t)s[i]);
+    }
+    out.push_back(0);
+    return out;
+}
+
 void CodeGenerator::emitMemCopy(Reg dst, Reg src, uint32_t sz){
     Reg t = alloc();
     for(uint32_t o = 0; o < sz; ){
@@ -394,15 +413,19 @@ static const Reg argRegs[6] = {Reg::rdi, Reg::rsi, Reg::rdx, Reg::rcx, Reg::r8, 
 
 static void assignParamOffsets(FuncDecl& node, FuncInfo& f){
     int32_t stackArg = 16;
+    std::size_t gp = 0, sse = 0;                 // SysV: GP and SSE args count separately
     for(std::size_t i = 0; i < node.params.size(); ++i){
         VarDecl* p = node.params[i].get();
         uint32_t s = sizeOf(p->type.get());
         uint32_t a = alignOf(p->type.get());
         VarInfo vi{ p->name, s, a, Storage::Stack, Section::Text};
-        if(i < 6){
+        bool isSse = regClassOf(p->type.get()) == RegClass::Sse;
+        bool inReg = isSse ? sse < 8 : gp < 6;
+        if(inReg){
             f.frameSize = (f.frameSize + 8 + 7) & ~7u;
             vi.rbpOffset = -(int32_t)f.frameSize;
-            f.body += "\tmov [rbp" + std::to_string(vi.rbpOffset) + "], " + regName(argRegs[i]) + "\n";
+            if(isSse) f.body += "\tmovsd " + CodeGenerator::memOf(vi.rbpOffset) + ", xmm" + std::to_string(sse++) + "\n";
+            else      f.body += "\tmov " + CodeGenerator::memOf(vi.rbpOffset) + ", " + regName(argRegs[gp++]) + "\n";
         } else {
             vi.rbpOffset = stackArg;
             stackArg += 8;
@@ -514,8 +537,12 @@ void CodeGenerator::visit(ForStmt& node){
 void CodeGenerator::visit(ReturnStmt& node){
 if(node.value){
           Reg r = emitRValue(*node.value);
-          if(r != Reg::rax)
+          if(isXmm(r)){                                    // float returns in xmm0
+              if(r != Reg::xmm0)
+                  current.body += "\tmovsd xmm0, " + std::string(regName(r)) + "\n";
+          }else if(r != Reg::rax){
               current.body += "\tmov rax, " + std::string(regName(r)) + "\n";
+          }
           freeReg(r);
       }
       current.body += "\tjmp .Lreturn_" + current.name + "\n";
@@ -555,6 +582,17 @@ void CodeGenerator::emitLocalVar(VarDecl& vd){
         return;
     }
     if(vd.init){
+        // char[] = "literal": store decoded bytes, zero-fill the rest
+        if(dynamic_cast<ArrayType*>(vd.type.get())){
+            if(auto sl = dynamic_cast<StringLiteral*>(vd.init.get())){
+                auto bytes = decodeStr(sl->value);
+                for(uint32_t i = 0; i < s; ++i){
+                    int v = i < bytes.size() ? bytes[i] : 0;
+                    current.body += "\tmov byte " + memOf(off + (int32_t)i) + ", " + std::to_string(v) + "\n";
+                }
+                return;
+            }
+        }
         if(auto l = layoutOf(vd.type.get())){
             Reg dst = alloc();
             current.body += "\tlea " + R(dst) + ", " + memOf(off) + "\n";
@@ -659,9 +697,25 @@ void CodeGenerator::visit(BinaryExpr& node){
 
         if(isComparison(node.op)){
             if(cls == RegClass::Sse){
-                current.body += "\tucomisd " + R(l) + ", " + R(r) + "\n";
+                // IEEE: NaN is unordered. ucomisd sets CF=ZF=PF=1 when unordered.
+                // seta/setae need CF=0, so they are already false for NaN; emit
+                // < / <= as swapped > / >=. ==/!= additionally test parity (PF).
                 Reg res = alloc(RegClass::Int);
-                current.body += "\t" + std::string(sseCC(node.op)) + " al\n";
+                switch(node.op){
+                    case BinaryOp::Greater:
+                        current.body += "\tucomisd " + R(l) + ", " + R(r) + "\n\tseta al\n"; break;
+                    case BinaryOp::GreaterEqual:
+                        current.body += "\tucomisd " + R(l) + ", " + R(r) + "\n\tsetae al\n"; break;
+                    case BinaryOp::Less:                       // l < r  ==  r > l
+                        current.body += "\tucomisd " + R(r) + ", " + R(l) + "\n\tseta al\n"; break;
+                    case BinaryOp::LessEqual:                  // l <= r ==  r >= l
+                        current.body += "\tucomisd " + R(r) + ", " + R(l) + "\n\tsetae al\n"; break;
+                    case BinaryOp::Equal:                      // ordered AND equal
+                        current.body += "\tucomisd " + R(l) + ", " + R(r) + "\n\tsete al\n\tsetnp cl\n\tand al, cl\n"; break;
+                    case BinaryOp::NotEqual:                   // unordered OR unequal
+                        current.body += "\tucomisd " + R(l) + ", " + R(r) + "\n\tsetne al\n\tsetp cl\n\tor al, cl\n"; break;
+                    default: break;
+                }
                 current.body += "\tmovzx " + R(res) + ", al\n";
                 freeReg(l); freeReg(r);
                 resultReg = res;
@@ -962,7 +1016,7 @@ void CodeGenerator::visit(TypeidExpr& node){
     std::string lbl = "Lstr" + std::to_string(labelId++);
     rodataBuf += lbl + ": db \"" + typeStr(node.expr->resultType.get()) + "\", 0\n";
     Reg r = alloc();
-    current.body += "\tlea " + R(r) + ", [abs " + lbl + "]\n";
+    current.body += "\tlea " + R(r) + ", [rel " + lbl + "]\n";
     resultReg = r;
 }
 
@@ -1004,20 +1058,15 @@ void CodeGenerator::visit(NullLiteral&){
 
 void CodeGenerator::visit(StringLiteral& node){
     std::string lbl = "Lstr" + std::to_string(labelId++);
-    std::string s(node.value);
     rodataBuf += lbl + ": db ";
     bool first = true;
-    auto put = [&](int b){ rodataBuf += (first?"":", ") + std::to_string(b); first = false; };
-    for(std::size_t i = 0; i < s.size(); ++i){
-        if(s[i]=='\\' && i+1<s.size()){
-            char n = s[++i];
-            put(n=='n'?10 : n=='t'?9 : n=='r'?13 : n=='0'?0 : n);
-        } else put((unsigned char)s[i]);
-    }   
-    put(0);
-    rodataBuf += "\n";                                        
+    for(uint8_t b : decodeStr(node.value)){
+        rodataBuf += (first?"":", ") + std::to_string((int)b);
+        first = false;
+    }
+    rodataBuf += "\n";
     Reg r = alloc();
-    current.body += "\tlea " + std::string(regName(r)) + ", [abs " + lbl + "]\n";
+    current.body += "\tlea " + std::string(regName(r)) + ", [rel " + lbl + "]\n";
     resultReg = r;
 }
 
