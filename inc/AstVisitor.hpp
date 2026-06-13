@@ -3,17 +3,39 @@
 #pragma once
 
 struct TranslationUnit;
-struct VarDecl; struct FuncDecl; struct StructDecl;
-struct BlockStmt; struct ExprStmt; struct IfStmt;
-struct WhileStmt; struct ForStmt; struct ReturnStmt;
-struct BreakStmt; struct ContinueStmt; struct DeclStmt;
-struct BinaryExpr; struct UnaryExpr; struct CallExpr; struct CastExpr;
-struct IndexExpr; struct AccessExpr; struct SizeofExpr; struct TypeidExpr;
-struct IntLiteral; struct FloatLiteral; struct CharLiteral; struct BoolLiteral; struct NullLiteral; struct StringLiteral;
+struct VarDecl;
+struct FuncDecl;
+struct StructDecl;
+struct BlockStmt;
+struct ExprStmt;
+struct IfStmt;
+struct WhileStmt;
+struct ForStmt;
+struct ReturnStmt;
+struct BreakStmt;
+struct ContinueStmt;
+struct DeclStmt;
+struct BinaryExpr;
+struct UnaryExpr;
+struct CallExpr;
+struct CastExpr;
+struct IndexExpr;
+struct AccessExpr;
+struct SizeofExpr;
+struct TypeidExpr;
+struct IntLiteral;
+struct FloatLiteral;
+struct CharLiteral;
+struct BoolLiteral;
+struct NullLiteral;
+struct StringLiteral;
 struct Identifier;
-struct BuiltinType; struct PointerType; struct ArrayType; struct FuncType;
+struct BuiltinType;
+struct PointerType;
+struct ArrayType;
+struct FuncType;
 
-struct AstVisitor{
+struct AstVisitor {
     virtual ~AstVisitor() = default;
 
     virtual void visit(TranslationUnit&) = 0;

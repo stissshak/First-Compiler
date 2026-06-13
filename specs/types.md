@@ -20,6 +20,12 @@ are two's complement; overflow wraps around. `uint` loads zero-extend and use
 unsigned comparison, division and right shift; mixed `int`/`uint` comparisons
 compare unsigned.
 
+Bitwise operators (`& | ^ ~ << >>`), their compound-assignment forms, and
+`++`/`--` apply to the integer family. Shifts execute on a 64-bit register, so
+the shift count is taken **modulo 64** (matching x86 `SAL`/`SAR`/`SHR`); a
+negative count uses its unsigned bit pattern (`x >> -1` is `x >> 63`). Right
+shift is arithmetic for signed integers and logical for `uint`.
+
 `float` follows IEEE-754: the literals `inf` and `nan` denote positive infinity
 and NaN (`-inf` is `inf` negated), and division does **not** trap (`1.0/0.0` is
 `inf`, `0.0/0.0` is `nan`). NaN is unordered: `<`, `>`, `<=`, `>=` and `==`

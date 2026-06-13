@@ -1,73 +1,82 @@
 // MPL/src/AstAnalyser.cpp
 
-#include <unordered_map>
-#include <stack>
-#include <optional>
 #include <cctype>
+#include <optional>
+#include <stack>
+#include <unordered_map>
 
 #include "AstAnalyser.hpp"
 
-struct varInfo{
+struct varInfo {
     Type* varType;
     bool inited;
     bool isConst = false;
 };
 
-
-struct funcInfo{
+struct funcInfo {
     FuncType* funcType;
     bool isDefined = false;
     bool isExtern = false;
 };
 
-struct strctInfo{
+struct strctInfo {
     std::vector<std::pair<std::string_view, DeclInfo>> fields;
 };
 
-struct DeclInfo{
+struct DeclInfo {
     std::variant<varInfo, funcInfo, strctInfo> info;
 };
 
-struct Scope{
-    Scope *parent;
+struct Scope {
+    Scope* parent;
     std::unordered_map<std::string_view, DeclInfo> symbols;
 };
 
 strctInfo* lookupStruct(std::string_view name, Scope* curScope);
 
-static bool isByte(Type* t){
+static bool isByte(Type* t) {
     auto b = dynamic_cast<BuiltinType*>(t);
     return b && b->type == BuiltinTypes::Byte;
 }
 
-static bool isFloatTy(Type* t){
+static bool isFloatTy(Type* t) {
     auto b = dynamic_cast<BuiltinType*>(t);
     return b && b->type == BuiltinTypes::Float;
 }
 
-static bool isBoolTy(Type* t){
+static bool isBoolTy(Type* t) {
     auto b = dynamic_cast<BuiltinType*>(t);
     return b && b->type == BuiltinTypes::Bool;
 }
 
-static bool isScalar(Type* t){
+static bool isScalar(Type* t) {
     auto b = dynamic_cast<BuiltinType*>(t);
-    if(!b) return false;
-    switch(b->type){
-        case BuiltinTypes::Int:  case BuiltinTypes::Float: case BuiltinTypes::Char:
-        case BuiltinTypes::Bool: case BuiltinTypes::Short: case BuiltinTypes::Long:
-        case BuiltinTypes::UInt: return true;
-        default: return false;
+    if (!b)
+        return false;
+    switch (b->type) {
+    case BuiltinTypes::Int:
+    case BuiltinTypes::Float:
+    case BuiltinTypes::Char:
+    case BuiltinTypes::Bool:
+    case BuiltinTypes::Short:
+    case BuiltinTypes::Long:
+    case BuiltinTypes::UInt:
+        return true;
+    default:
+        return false;
     }
 }
 
-static void coerce(std::unique_ptr<Expr>& e, Type* to){
-    if(!e || !e->resultType || !to) return;
+static void coerce(std::unique_ptr<Expr>& e, Type* to) {
+    if (!e || !e->resultType || !to)
+        return;
     Type* from = e->resultType.get();
-    if(!isScalar(from) || !isScalar(to)) return;
+    if (!isScalar(from) || !isScalar(to))
+        return;
     bool classChange = isFloatTy(from) != isFloatTy(to);
-    bool normBool    = isBoolTy(to) && !isBoolTy(from);
-    if(!classChange && !normBool) return;
+    bool normBool = isBoolTy(to) && !isBoolTy(from);
+    if (!classChange && !normBool)
+        return;
     auto c = std::make_unique<CastExpr>();
     c->offset = e->offset;
     c->target = to->clone();
@@ -76,76 +85,79 @@ static void coerce(std::unique_ptr<Expr>& e, Type* to){
     e = std::move(c);
 }
 
-static varInfo* lookupVar(Scope* s, std::string_view name){
-    for(; s; s = s->parent){
+static varInfo* lookupVar(Scope* s, std::string_view name) {
+    for (; s; s = s->parent) {
         auto it = s->symbols.find(name);
-        if(it == s->symbols.end()) continue;
+        if (it == s->symbols.end())
+            continue;
         return std::get_if<varInfo>(&it->second.info);
     }
     return nullptr;
 }
 
-static void markInited(Scope* s, std::string_view name){
-    if(auto v = lookupVar(s, name)) v->inited = true;
+static void markInited(Scope* s, std::string_view name) {
+    if (auto v = lookupVar(s, name))
+        v->inited = true;
 }
 
-static bool isFuncName(Scope* s, std::string_view name){
-    for(; s; s = s->parent){
+static bool isFuncName(Scope* s, std::string_view name) {
+    for (; s; s = s->parent) {
         auto it = s->symbols.find(name);
-        if(it == s->symbols.end()) continue;
+        if (it == s->symbols.end())
+            continue;
         return std::holds_alternative<funcInfo>(it->second.info);
     }
     return false;
 }
 
-void AstAnalyser::err(std::string_view msg){
+void AstAnalyser::err(std::string_view msg) {
     ++errCount;
     cl.error("error: " + std::string(msg));
 }
 
-void AstAnalyser::err(const Node& n, std::string_view msg){
+void AstAnalyser::err(const Node& n, std::string_view msg) {
     ++errCount;
     cl.error(smap.where(n.offset, buffer) + ": error: " + std::string(msg));
 }
 
-void AstAnalyser::warn(const Node& n, std::string_view msg){
+void AstAnalyser::warn(const Node& n, std::string_view msg) {
     cl.warning(smap.where(n.offset, buffer) + ": warning: " + std::string(msg));
 }
 
-void AstAnalyser::checkTypes(Type* a, Type* b, const Node& n, std::string_view msg){
-    if (!a || !b) return;
+void AstAnalyser::checkTypes(Type* a, Type* b, const Node& n, std::string_view msg) {
+    if (!a || !b)
+        return;
     switch (checkCast(a, b)) {
-        case castResult::Equal:
-        case castResult::Implicit:
-            break;
-        case castResult::Warn:
-            warn(n, msg);
-            break;
-        case castResult::No:
-            err(n, msg);
-            break;
+    case castResult::Equal:
+    case castResult::Implicit:
+        break;
+    case castResult::Warn:
+        warn(n, msg);
+        break;
+    case castResult::No:
+        err(n, msg);
+        break;
     }
 }
 
-
-bool AstAnalyser::analyse(TranslationUnit& unit){
+bool AstAnalyser::analyse(TranslationUnit& unit) {
     unit.accept(*this);
     return errCount == 0;
 }
 
-
 // libc-backed builtins
-void AstAnalyser::addBuiltins(){
-    auto add = [&](std::string_view name, std::unique_ptr<FuncType> f){
+void AstAnalyser::addBuiltins() {
+    auto add = [&](std::string_view name, std::unique_ptr<FuncType> f) {
         funcInfo fi{f.get()};
         fi.isExtern = true;
         funcTypes.push_back(std::move(f));
         curScope->symbols.emplace(name, DeclInfo{fi});
     };
-    auto sig = [&](Type& ret, Type* param, bool variadic){
+    auto sig = [&](Type& ret, Type* param, bool variadic) {
         auto f = std::make_unique<FuncType>();
         f->returnType = ret.clone();
-        if(param) f->params.push_back(param->clone());
+        if (param)
+            f->params.push_back(param->clone());
         f->variadic = variadic;
         return f;
     };
@@ -153,156 +165,161 @@ void AstAnalyser::addBuiltins(){
     PointerType charPtr(charType.clone());
     PointerType voidPtr(voidType.clone());
 
-    add("print",  sig(intType,  &charPtr, true));    // printf
-    add("input",  sig(intType,  &charPtr, true));    // scanf
-    add("exit",   sig(voidType, &intType, false));
-    add("panic",  sig(voidType, &charPtr, false));   // message + exit(1)
-    add("assert", sig(voidType, &boolType, false));  // runtime error if false
-    add("free",   sig(voidType, &voidPtr, false));
+    add("print", sig(intType, &charPtr, true)); // printf
+    add("input", sig(intType, &charPtr, true)); // scanf
+    add("exit", sig(voidType, &intType, false));
+    add("panic", sig(voidType, &charPtr, false));   // message + exit(1)
+    add("assert", sig(voidType, &boolType, false)); // runtime error if false
+    add("free", sig(voidType, &voidPtr, false));
 
-    auto m = std::make_unique<FuncType>();           // void* malloc(int)
+    auto m = std::make_unique<FuncType>(); // void* malloc(int)
     m->returnType = voidPtr.clone();
     m->params.push_back(intType.clone());
     add("malloc", std::move(m));
 }
 
-void AstAnalyser::visit(TranslationUnit& node){
+void AstAnalyser::visit(TranslationUnit& node) {
     curScope = new Scope;
     curScope->parent = nullptr;
     addBuiltins();
-    for(std::size_t i = 0; i < node.decls.size(); ++i){
+    for (std::size_t i = 0; i < node.decls.size(); ++i) {
         node.decls[i]->accept(*this);
     }
     auto it = curScope->symbols.find("main");
-    if(it == curScope->symbols.end())
+    if (it == curScope->symbols.end())
         err("no 'main' function");
-    else if(auto f = std::get_if<funcInfo>(&it->second.info)){
+    else if (auto f = std::get_if<funcInfo>(&it->second.info)) {
         auto rt = dynamic_cast<BuiltinType*>(f->funcType->returnType.get());
-        if(!rt || rt->type != BuiltinTypes::Int)
+        if (!rt || rt->type != BuiltinTypes::Int)
             err("'main' must return int");
-    }else{
+    } else {
         err("'main' is not a function");
     }
 
-    for(auto& [name, di] : curScope->symbols){
-        if(auto f = std::get_if<funcInfo>(&di.info))
-            if(!f->isDefined && !f->isExtern)
+    for (auto& [name, di] : curScope->symbols) {
+        if (auto f = std::get_if<funcInfo>(&di.info))
+            if (!f->isDefined && !f->isExtern)
                 err("Function '" + std::string(name) + "' is declared but never defined");
     }
     delete curScope;
 }
-void AstAnalyser::visit(VarDecl& node){
-    if(curScope->symbols.find(node.name) != curScope->symbols.end()){
+void AstAnalyser::visit(VarDecl& node) {
+    if (curScope->symbols.find(node.name) != curScope->symbols.end()) {
         err(node, "Var was declarated");
         return;
     }
 
-    if(node.isConst && !node.init && node.initList.empty()){
+    if (node.isConst && !node.init && node.initList.empty()) {
         err(node, "Const var must be initialized");
         return;
     }
 
     auto bt = dynamic_cast<BuiltinType*>(node.type.get());
-    bool inited = node.init != nullptr
-        || dynamic_cast<ArrayType*>(node.type.get())
-        || (bt && bt->type == BuiltinTypes::Custom);
+    bool inited = node.init != nullptr || dynamic_cast<ArrayType*>(node.type.get()) ||
+                  (bt && bt->type == BuiltinTypes::Custom);
     DeclInfo di = {varInfo{node.type.get(), inited, node.isConst}};
 
-    if(node.init){
+    if (node.init) {
         node.init->accept(*this);
         auto at = dynamic_cast<ArrayType*>(node.type.get());
         auto sl = dynamic_cast<StringLiteral*>(node.init.get());
-        if(at && sl){                                    // char[] = "literal"
+        if (at && sl) { // char[] = "literal"
             auto et = dynamic_cast<BuiltinType*>(at->elemType.get());
-            std::size_t len = 0;                         // decoded length
+            std::size_t len = 0; // decoded length
             auto& v = sl->value;
-            for(std::size_t i = 0; i < v.size(); ++i){
-                if(v[i]=='\\' && i+1 < v.size()){
-                    if(v[++i]=='x')                          // \xHH...: consume hex digits
-                        while(i+1<v.size() && std::isxdigit((unsigned char)v[i+1])) ++i;
+            for (std::size_t i = 0; i < v.size(); ++i) {
+                if (v[i] == '\\' && i + 1 < v.size()) {
+                    if (v[++i] == 'x') // \xHH...: consume hex digits
+                        while (i + 1 < v.size() && std::isxdigit((unsigned char)v[i + 1]))
+                            ++i;
                 }
                 ++len;
             }
-            if(!et || et->type != BuiltinTypes::Char)
+            if (!et || et->type != BuiltinTypes::Char)
                 err(node, "String literal initializes only a char array");
-            else if(len + 1 > at->size)
+            else if (len + 1 > at->size)
                 err(node, "String literal too long for array");
-        }else{
+        } else {
             checkTypes(node.type.get(), curType, node, "Incompatible types in initialization");
-            if(curScope->parent) coerce(node.init, node.type.get());  // runtime cvt; globals fold statically
+            if (curScope->parent)
+                coerce(node.init, node.type.get()); // runtime cvt; globals fold statically
         }
     }
 
-    if(!node.initList.empty()){
-        if(auto at = dynamic_cast<ArrayType*>(node.type.get())){
-            if(node.initList.size() > at->size) err(node, "Too many initializers");
-            for(auto& e : node.initList){
+    if (!node.initList.empty()) {
+        if (auto at = dynamic_cast<ArrayType*>(node.type.get())) {
+            if (node.initList.size() > at->size)
+                err(node, "Too many initializers");
+            for (auto& e : node.initList) {
                 e->accept(*this);
                 checkTypes(at->elemType.get(), curType, *e, "Incompatible type in initializer");
-                if(curScope->parent) coerce(e, at->elemType.get());
+                if (curScope->parent)
+                    coerce(e, at->elemType.get());
             }
-        }
-        else if(bt && bt->type == BuiltinTypes::Custom){
+        } else if (bt && bt->type == BuiltinTypes::Custom) {
             auto si = lookupStruct(bt->name, curScope);
-            if(!si) err(node, "Struct type not found");
-            else if(node.initList.size() > si->fields.size()) err(node, "Too many initializers");
-            else for(std::size_t i = 0; i < node.initList.size(); ++i){
-                node.initList[i]->accept(*this);
-                Type* ft = std::get<varInfo>(si->fields[i].second.info).varType;
-                checkTypes(ft, curType, *node.initList[i], "Incompatible type in initializer");
-                if(curScope->parent) coerce(node.initList[i], ft);
-            }
-        }
-        else err(node, "Init list on scalar type");
+            if (!si)
+                err(node, "Struct type not found");
+            else if (node.initList.size() > si->fields.size())
+                err(node, "Too many initializers");
+            else
+                for (std::size_t i = 0; i < node.initList.size(); ++i) {
+                    node.initList[i]->accept(*this);
+                    Type* ft = std::get<varInfo>(si->fields[i].second.info).varType;
+                    checkTypes(ft, curType, *node.initList[i], "Incompatible type in initializer");
+                    if (curScope->parent)
+                        coerce(node.initList[i], ft);
+                }
+        } else
+            err(node, "Init list on scalar type");
     }
 
     curScope->symbols.emplace(node.name, di);
 }
 
-void AstAnalyser::visit(StructDecl& node){
-    if(curScope->symbols.find(node.name) != curScope->symbols.end()){
+void AstAnalyser::visit(StructDecl& node) {
+    if (curScope->symbols.find(node.name) != curScope->symbols.end()) {
         err(node, "Struct was declarated");
         return;
     }
 
     strctInfo si;
 
-    for(auto& f : node.fields){
-       si.fields.emplace_back(f->name, DeclInfo{varInfo{f->type.get(), f->init != nullptr }});
+    for (auto& f : node.fields) {
+        si.fields.emplace_back(f->name, DeclInfo{varInfo{f->type.get(), f->init != nullptr}});
     }
     curScope->symbols.emplace(node.name, DeclInfo(si));
 }
 
-void AstAnalyser::analyseFuncBody(FuncDecl& node){
-      auto funcScope = new Scope;
-      funcScope->parent = curScope;
-      curScope = funcScope;
+void AstAnalyser::analyseFuncBody(FuncDecl& node) {
+    auto funcScope = new Scope;
+    funcScope->parent = curScope;
+    curScope = funcScope;
 
-      for(auto& p : node.params)                                                                                                                         
-          curScope->symbols.emplace(p->name, DeclInfo{varInfo{p->type.get(), true}});
+    for (auto& p : node.params)
+        curScope->symbols.emplace(p->name, DeclInfo{varInfo{p->type.get(), true}});
 
-      auto savedRetType = retType;
-      retType = node.returnType.get();
-  
-      node.body->accept(*this);
+    auto savedRetType = retType;
+    retType = node.returnType.get();
 
-      curScope = funcScope->parent;
-      retType = savedRetType;
-      delete funcScope;
+    node.body->accept(*this);
+
+    curScope = funcScope->parent;
+    retType = savedRetType;
+    delete funcScope;
 }
 
-
 // TODO split 2 for
-void AstAnalyser::visit(FuncDecl& node){
+void AstAnalyser::visit(FuncDecl& node) {
     auto f = curScope->symbols.find(node.name);
-    if(f != curScope->symbols.end()){
+    if (f != curScope->symbols.end()) {
         auto existing = std::get_if<funcInfo>(&f->second.info);
-        if(!existing || existing->isDefined){
+        if (!existing || existing->isDefined) {
             err(node, "Func was declarated");
             return;
         }
-        if(node.body){
-            if(existing->isExtern){
+        if (node.body) {
+            if (existing->isExtern) {
                 err(node, "Extern function cannot be defined");
                 return;
             }
@@ -316,7 +333,7 @@ void AstAnalyser::visit(FuncDecl& node){
     ft->returnType = node.returnType->clone();
     ft->variadic = node.variadic;
 
-    for(auto& p: node.params){
+    for (auto& p : node.params) {
         ft->params.push_back(p->type.get()->clone());
     }
 
@@ -324,7 +341,7 @@ void AstAnalyser::visit(FuncDecl& node){
     fi.isExtern = node.isExtern;
     funcTypes.push_back(std::move(ft));
 
-    if(!node.body){
+    if (!node.body) {
         fi.isDefined = false;
         curScope->symbols.emplace(node.name, DeclInfo(fi));
         return;
@@ -336,13 +353,12 @@ void AstAnalyser::visit(FuncDecl& node){
     analyseFuncBody(node);
 }
 
-
-void AstAnalyser::visit(BlockStmt& node){
+void AstAnalyser::visit(BlockStmt& node) {
     auto blockScope = new Scope;
     blockScope->parent = curScope;
     curScope = blockScope;
 
-    for(auto& s: node.statements){
+    for (auto& s : node.statements) {
         s->accept(*this);
     }
 
@@ -350,21 +366,21 @@ void AstAnalyser::visit(BlockStmt& node){
     delete blockScope;
 }
 
-
-void AstAnalyser::visit(ExprStmt& node){
-    if(node.expr) node.expr->accept(*this);   // null stmt
+void AstAnalyser::visit(ExprStmt& node) {
+    if (node.expr)
+        node.expr->accept(*this); // null stmt
 }
 
 // TODO cond -> bool
 
-void AstAnalyser::visit(IfStmt& node){
+void AstAnalyser::visit(IfStmt& node) {
     node.cond->accept(*this);
     node.thenPart->accept(*this);
-    if(node.elsePart) node.elsePart->accept(*this);
+    if (node.elsePart)
+        node.elsePart->accept(*this);
 }
 
-
-void AstAnalyser::visit(WhileStmt& node){
+void AstAnalyser::visit(WhileStmt& node) {
     auto wasInLoop = isInLoop;
     isInLoop = true;
     node.cond->accept(*this);
@@ -372,18 +388,21 @@ void AstAnalyser::visit(WhileStmt& node){
     isInLoop = wasInLoop;
 }
 
-
-void AstAnalyser::visit(ForStmt& node){
+void AstAnalyser::visit(ForStmt& node) {
     auto wasInLoop = isInLoop;
     isInLoop = true;
     auto forScope = new Scope;
     forScope->parent = curScope;
     curScope = forScope;
 
-    if(node.initDecl != nullptr) node.initDecl->accept(*this);
-    else if(node.initStmt != nullptr) node.initStmt->accept(*this);
-    if(node.cond != nullptr) node.cond->accept(*this);
-    if(node.incr != nullptr) node.incr->accept(*this);
+    if (node.initDecl != nullptr)
+        node.initDecl->accept(*this);
+    else if (node.initStmt != nullptr)
+        node.initStmt->accept(*this);
+    if (node.cond != nullptr)
+        node.cond->accept(*this);
+    if (node.incr != nullptr)
+        node.incr->accept(*this);
     node.body->accept(*this);
 
     curScope = curScope->parent;
@@ -391,42 +410,40 @@ void AstAnalyser::visit(ForStmt& node){
     isInLoop = wasInLoop;
 }
 
-
-void AstAnalyser::visit(ReturnStmt& node){
-    if(node.value) node.value->accept(*this);
-    else curType = &voidType;
+void AstAnalyser::visit(ReturnStmt& node) {
+    if (node.value)
+        node.value->accept(*this);
+    else
+        curType = &voidType;
     checkTypes(retType, curType, node, "Return type mismatch");
-    if(node.value) coerce(node.value, retType);
+    if (node.value)
+        coerce(node.value, retType);
 }
 
-
-void AstAnalyser::visit(BreakStmt& node){
-    if(!isInLoop){
+void AstAnalyser::visit(BreakStmt& node) {
+    if (!isInLoop) {
         err(node, "Break statement not at loop");
     }
 }
 
-
-void AstAnalyser::visit(ContinueStmt& node){
-    if(!isInLoop){
+void AstAnalyser::visit(ContinueStmt& node) {
+    if (!isInLoop) {
         err(node, "Continue statement not at loop");
     }
 }
 
-
-void AstAnalyser::visit(DeclStmt& node){
-    node.decl->accept(*this);
-}
+void AstAnalyser::visit(DeclStmt& node) { node.decl->accept(*this); }
 
 // Change assign, from binary to other AST node
-void AstAnalyser::visit(BinaryExpr& node){
-    if(node.op >= BinaryOp::Assign){
-        if(auto id = dynamic_cast<Identifier*>(node.left.get())){
-            if(auto v = lookupVar(curScope, id->name); v && v->isConst)
+void AstAnalyser::visit(BinaryExpr& node) {
+    if (node.op >= BinaryOp::Assign) {
+        if (auto id = dynamic_cast<Identifier*>(node.left.get())) {
+            if (auto v = lookupVar(curScope, id->name); v && v->isConst)
                 err(node, "Assign to const var");
-            else if(!v && isFuncName(curScope, id->name))
+            else if (!v && isFuncName(curScope, id->name))
                 err(node, "Function is not assignable");
-            if(node.op == BinaryOp::Assign) markInited(curScope, id->name);
+            if (node.op == BinaryOp::Assign)
+                markInited(curScope, id->name);
         }
     }
 
@@ -436,27 +453,27 @@ void AstAnalyser::visit(BinaryExpr& node){
     auto rType = curType;
 
     // raw data: only =, ==, != are allowed
-    if((isByte(lType) || isByte(rType))
-            && node.op != BinaryOp::Assign
-            && node.op != BinaryOp::Equal && node.op != BinaryOp::NotEqual)
+    if ((isByte(lType) || isByte(rType)) && node.op != BinaryOp::Assign &&
+        node.op != BinaryOp::Equal && node.op != BinaryOp::NotEqual)
         err(node, "byte is not arithmetic");
 
     // floats have no %, bitwise or shift
-    if(auto b = dynamic_cast<BuiltinType*>(lType); b && b->type == BuiltinTypes::Float){
-        bool bad = node.op == BinaryOp::Mod
-            || (node.op >= BinaryOp::BitAnd && node.op <= BinaryOp::Shr)
-            || node.op >= BinaryOp::ModAssign;
-        if(bad) err(node, "Invalid operator for float");
+    if (auto b = dynamic_cast<BuiltinType*>(lType); b && b->type == BuiltinTypes::Float) {
+        bool bad = node.op == BinaryOp::Mod ||
+                   (node.op >= BinaryOp::BitAnd && node.op <= BinaryOp::Shr) ||
+                   node.op >= BinaryOp::ModAssign;
+        if (bad)
+            err(node, "Invalid operator for float");
     }
 
-    if(node.op >= BinaryOp::Assign){
+    if (node.op >= BinaryOp::Assign) {
         // no stores through const int*
-        if(auto u = dynamic_cast<UnaryExpr*>(node.left.get()); u && u->op == UnaryOp::Deref){
-            if(auto p = dynamic_cast<PointerType*>(u->child->resultType.get()); p && p->constBase)
+        if (auto u = dynamic_cast<UnaryExpr*>(node.left.get()); u && u->op == UnaryOp::Deref) {
+            if (auto p = dynamic_cast<PointerType*>(u->child->resultType.get()); p && p->constBase)
                 err(node, "Assign through const pointer");
         }
-        if(auto ix = dynamic_cast<IndexExpr*>(node.left.get())){
-            if(auto p = dynamic_cast<PointerType*>(ix->arr->resultType.get()); p && p->constBase)
+        if (auto ix = dynamic_cast<IndexExpr*>(node.left.get())) {
+            if (auto p = dynamic_cast<PointerType*>(ix->arr->resultType.get()); p && p->constBase)
                 err(node, "Assign through const pointer");
         }
     }
@@ -464,125 +481,123 @@ void AstAnalyser::visit(BinaryExpr& node){
     checkTypes(lType, rType, node, "Incompatible types in binary expression");
 
     Type* common = lType;
-    if(node.op >= BinaryOp::Assign){
+    if (node.op >= BinaryOp::Assign) {
         coerce(node.right, lType);
-    }else if(isFloatTy(lType) != isFloatTy(rType)){
+    } else if (isFloatTy(lType) != isFloatTy(rType)) {
         common = isFloatTy(lType) ? lType : rType;
         coerce(node.left, common);
         coerce(node.right, common);
     }
 
-    switch(node.op){
-        case BinaryOp::Less:
-        case BinaryOp::Greater:
-        case BinaryOp::Equal:
-        case BinaryOp::NotEqual:
-        case BinaryOp::LessEqual:
-        case BinaryOp::GreaterEqual:
-        case BinaryOp::And:
-        case BinaryOp::Or:
-            curType = &boolType;
-            break;
-        default:
-            curType = common;
-            break;
+    switch (node.op) {
+    case BinaryOp::Less:
+    case BinaryOp::Greater:
+    case BinaryOp::Equal:
+    case BinaryOp::NotEqual:
+    case BinaryOp::LessEqual:
+    case BinaryOp::GreaterEqual:
+    case BinaryOp::And:
+    case BinaryOp::Or:
+        curType = &boolType;
+        break;
+    default:
+        curType = common;
+        break;
     }
     node.resultType = curType->clone();
-
 }
 
 // TODO portfix + assign check
 // TODO weakptr
-void AstAnalyser::visit(UnaryExpr& node){
-    if(node.op == UnaryOp::AddressOf){
-        if(auto id = dynamic_cast<Identifier*>(node.child.get())){
+void AstAnalyser::visit(UnaryExpr& node) {
+    if (node.op == UnaryOp::AddressOf) {
+        if (auto id = dynamic_cast<Identifier*>(node.child.get())) {
             markInited(curScope, id->name);
         }
     }
 
     node.child->accept(*this);
 
-    if(isByte(curType) && node.op != UnaryOp::AddressOf)
+    if (isByte(curType) && node.op != UnaryOp::AddressOf)
         err(node, "byte is not arithmetic");
 
-    if(node.op >= UnaryOp::PreInc && node.op <= UnaryOp::PostDec){
-        if(auto b = dynamic_cast<BuiltinType*>(curType); b && b->type == BuiltinTypes::Float)
+    if (node.op >= UnaryOp::PreInc && node.op <= UnaryOp::PostDec) {
+        if (auto b = dynamic_cast<BuiltinType*>(curType); b && b->type == BuiltinTypes::Float)
             err(node, "++/-- is not supported for float");
-        if(auto id = dynamic_cast<Identifier*>(node.child.get())){
-            if(auto v = lookupVar(curScope, id->name); v && v->isConst)
+        if (auto id = dynamic_cast<Identifier*>(node.child.get())) {
+            if (auto v = lookupVar(curScope, id->name); v && v->isConst)
                 err(node, "Assign to const var");
-        }
-        else if(!dynamic_cast<IndexExpr*>(node.child.get())
-             && !dynamic_cast<AccessExpr*>(node.child.get())){
+        } else if (!dynamic_cast<IndexExpr*>(node.child.get()) &&
+                   !dynamic_cast<AccessExpr*>(node.child.get())) {
             auto u = dynamic_cast<UnaryExpr*>(node.child.get());
-            if(!u || u->op != UnaryOp::Deref) err(node, "++/-- needs an lvalue");
+            if (!u || u->op != UnaryOp::Deref)
+                err(node, "++/-- needs an lvalue");
         }
     }
 
-    switch(node.op){
-        case UnaryOp::Pos:
-        case UnaryOp::Neg:
-        case UnaryOp::PreInc:
-        case UnaryOp::PreDec:
-        case UnaryOp::PostInc:
-        case UnaryOp::PostDec:
-            break;
-        case UnaryOp::Not:
-        case UnaryOp::BitNot:
-            curType = &intType;
-            break;
-        case UnaryOp::AddressOf:{
-            if(curType == nullptr){
-                err(node, "Cannot take address of unknown type");
-                break;
-            }
-            auto pt = std::make_unique<PointerType>();
-            pt->base = curType->clone();
-            // &const-var gives const int*
-            if(auto id = dynamic_cast<Identifier*>(node.child.get())){
-                if(auto v = lookupVar(curScope, id->name); v && v->isConst)
-                    pt->constBase = true;
-            }
-            curType = pt.get();
-            ptrTypes.push_back(std::move(pt));
+    switch (node.op) {
+    case UnaryOp::Pos:
+    case UnaryOp::Neg:
+    case UnaryOp::PreInc:
+    case UnaryOp::PreDec:
+    case UnaryOp::PostInc:
+    case UnaryOp::PostDec:
+        break;
+    case UnaryOp::Not:
+    case UnaryOp::BitNot:
+        curType = &intType;
+        break;
+    case UnaryOp::AddressOf: {
+        if (curType == nullptr) {
+            err(node, "Cannot take address of unknown type");
             break;
         }
-        case UnaryOp::Deref:
+        auto pt = std::make_unique<PointerType>();
+        pt->base = curType->clone();
+        // &const-var gives const int*
+        if (auto id = dynamic_cast<Identifier*>(node.child.get())) {
+            if (auto v = lookupVar(curScope, id->name); v && v->isConst)
+                pt->constBase = true;
+        }
+        curType = pt.get();
+        ptrTypes.push_back(std::move(pt));
+        break;
+    }
+    case UnaryOp::Deref:
         // TODO void pointer deref
-        if(auto pt = dynamic_cast<PointerType*>(curType)){
+        if (auto pt = dynamic_cast<PointerType*>(curType)) {
             curType = pt->base.get();
-            if(auto tmp = dynamic_cast<BuiltinType*>(curType); tmp && tmp->type == BuiltinTypes::Void){
+            if (auto tmp = dynamic_cast<BuiltinType*>(curType);
+                tmp && tmp->type == BuiltinTypes::Void) {
                 err(node, "Deref of void pointer");
             }
         } else {
             err(node, "Deref of not a pointer");
         }
         break;
-
     }
-    if(curType) node.resultType = curType->clone();
+    if (curType)
+        node.resultType = curType->clone();
 }
 
-
-void AstAnalyser::visit(CallExpr& node){
+void AstAnalyser::visit(CallExpr& node) {
     node.func->accept(*this);
     auto fType = dynamic_cast<FuncType*>(curType);
-    if(fType == nullptr){
+    if (fType == nullptr) {
         err(node, "Called object is not a function");
         curType = nullptr;
         return;
-    }
-    else{
+    } else {
         bool countOk = fType->variadic ? node.param.size() >= fType->params.size()
                                        : node.param.size() == fType->params.size();
-        if(!countOk){
+        if (!countOk) {
             err(node, "Declarated number of arguments not equal");
-        }
-        else{
-            for(std::size_t i = 0; i < node.param.size(); ++i){
+        } else {
+            for (std::size_t i = 0; i < node.param.size(); ++i) {
                 node.param[i]->accept(*this);
-                if(i < fType->params.size()){
-                    checkTypes(fType->params[i].get(), curType, *node.param[i], "Incompatible argument type");
+                if (i < fType->params.size()) {
+                    checkTypes(fType->params[i].get(), curType, *node.param[i],
+                               "Incompatible argument type");
                     coerce(node.param[i], fType->params[i].get());
                 }
             }
@@ -592,72 +607,73 @@ void AstAnalyser::visit(CallExpr& node){
     node.resultType = curType->clone();
 }
 
-void AstAnalyser::visit(CastExpr& node){
+void AstAnalyser::visit(CastExpr& node) {
     node.expr->accept(*this);
     // byte: explicit cast, int/char only
-    bool byteCast = (isByte(node.target.get()) || isByte(curType))
-        && typeIndex(node.target.get()) != -1 && typeIndex(curType) != -1
-        && typeIndex(node.target.get()) != 1 && typeIndex(curType) != 1;   // not float
-    if(!byteCast)
+    bool byteCast = (isByte(node.target.get()) || isByte(curType)) &&
+                    typeIndex(node.target.get()) != -1 && typeIndex(curType) != -1 &&
+                    typeIndex(node.target.get()) != 1 && typeIndex(curType) != 1; // not float
+    if (!byteCast)
         checkTypes(node.target.get(), curType, node, "Incompatible cast types");
     curType = node.target.get();
     node.resultType = curType->clone();
 }
 
-void AstAnalyser::visit(IndexExpr& node){
+void AstAnalyser::visit(IndexExpr& node) {
     node.index->accept(*this);
     checkTypes(curType, &intType, node, "Must be integer in Array");
     node.arr->accept(*this);
-    if(auto at = dynamic_cast<ArrayType*>(curType)){
+    if (auto at = dynamic_cast<ArrayType*>(curType)) {
         curType = at->elemType.get();
-    }
-    else if(auto pt = dynamic_cast<PointerType*>(curType)) curType = pt->base.get();
-    else{
+    } else if (auto pt = dynamic_cast<PointerType*>(curType))
+        curType = pt->base.get();
+    else {
         err(node, "Not Array");
     }
     node.resultType = curType->clone();
 }
 
-strctInfo* lookupStruct(std::string_view name, Scope* curScope){
-    for (Scope* s = curScope; s; s = s->parent){
+strctInfo* lookupStruct(std::string_view name, Scope* curScope) {
+    for (Scope* s = curScope; s; s = s->parent) {
         auto it = s->symbols.find(name);
-        if (it == s->symbols.end()) continue;
+        if (it == s->symbols.end())
+            continue;
         return std::get_if<strctInfo>(&it->second.info);
     }
     return nullptr;
 }
 
-void AstAnalyser::visit(AccessExpr& node){
+void AstAnalyser::visit(AccessExpr& node) {
     node.object->accept(*this);
 
     BuiltinType* bt = nullptr;
-    if(node.kind == AccessKind::Dot){
+    if (node.kind == AccessKind::Dot) {
         bt = dynamic_cast<BuiltinType*>(curType);
-        if(!bt || bt->type != BuiltinTypes::Custom){
+        if (!bt || bt->type != BuiltinTypes::Custom) {
             err(node, "Member access on non-struct type");
             return;
         }
-    }else{
+    } else {
         auto pt = dynamic_cast<PointerType*>(curType);
-        if(!pt){
+        if (!pt) {
             err(node, "Arrow on non-pointer");
             return;
         }
         bt = dynamic_cast<BuiltinType*>(pt->base.get());
-        if(!bt || bt->type != BuiltinTypes::Custom){
+        if (!bt || bt->type != BuiltinTypes::Custom) {
             err(node, "Member access on non-struct type");
             return;
         }
     }
 
     auto si = lookupStruct(bt->name, curScope);
-    if(!si){
+    if (!si) {
         err(node, "Struct type not found");
         return;
     }
 
-    for(auto& f: si->fields){
-        if(f.first == node.field){
+    for (auto& f : si->fields) {
+        if (f.first == node.field) {
             curType = std::get<varInfo>(f.second.info).varType;
             node.resultType = curType->clone();
             return;
@@ -666,13 +682,14 @@ void AstAnalyser::visit(AccessExpr& node){
     err(node, "Field not found in struct");
 }
 
-void AstAnalyser::visit(SizeofExpr& node){
-    if(node.expr) node.expr->accept(*this);
+void AstAnalyser::visit(SizeofExpr& node) {
+    if (node.expr)
+        node.expr->accept(*this);
     curType = &intType;
     node.resultType = curType->clone();
 }
 
-void AstAnalyser::visit(TypeidExpr& node){
+void AstAnalyser::visit(TypeidExpr& node) {
     node.expr->accept(*this);
     auto pt = std::make_unique<PointerType>(charType.clone());
     curType = pt.get();
@@ -680,33 +697,31 @@ void AstAnalyser::visit(TypeidExpr& node){
     ptrTypes.push_back(std::move(pt));
 }
 
-
-void AstAnalyser::visit(IntLiteral& node){
+void AstAnalyser::visit(IntLiteral& node) {
     (void)node;
     curType = &intType;
     node.resultType = curType->clone();
 }
 
-
-void AstAnalyser::visit(FloatLiteral& node){
+void AstAnalyser::visit(FloatLiteral& node) {
     (void)node;
     curType = &floatType;
     node.resultType = curType->clone();
 }
 
-void AstAnalyser::visit(CharLiteral& node){
+void AstAnalyser::visit(CharLiteral& node) {
     (void)node;
     curType = &charType;
     node.resultType = curType->clone();
 }
 
-void AstAnalyser::visit(BoolLiteral& node){
+void AstAnalyser::visit(BoolLiteral& node) {
     (void)node;
     curType = &boolType;
     node.resultType = curType->clone();
 }
 
-void AstAnalyser::visit(StringLiteral& node){
+void AstAnalyser::visit(StringLiteral& node) {
     (void)node;
     auto pt = std::make_unique<PointerType>();
     pt->base = charType.clone();
@@ -716,51 +731,41 @@ void AstAnalyser::visit(StringLiteral& node){
 }
 
 // void*
-void AstAnalyser::visit(NullLiteral& node){
+void AstAnalyser::visit(NullLiteral& node) {
     auto pt = std::make_unique<PointerType>(voidType.clone());
     curType = pt.get();
     ptrTypes.push_back(std::move(pt));
     node.resultType = curType->clone();
 }
 
-
-void AstAnalyser::visit(Identifier& node){
-    for(Scope* s = curScope; s; s = s->parent){
+void AstAnalyser::visit(Identifier& node) {
+    for (Scope* s = curScope; s; s = s->parent) {
         auto it = s->symbols.find(node.name);
-        if(it == s->symbols.end()) continue;
-        if(auto v = std::get_if<varInfo>(&it->second.info)){
+        if (it == s->symbols.end())
+            continue;
+        if (auto v = std::get_if<varInfo>(&it->second.info)) {
             curType = v->varType;
             node.resultType = curType->clone();
-            if(!v->inited){
+            if (!v->inited) {
                 err(node, "Var is not inited");
             }
             return;
         }
-        if(auto f = std::get_if<funcInfo>(&it->second.info)){
+        if (auto f = std::get_if<funcInfo>(&it->second.info)) {
             curType = f->funcType;
             node.resultType = curType->clone();
             return;
         }
-          
+
         continue;
-      }
+    }
     err(node, "Identifier not found");
 }
 
+void AstAnalyser::visit(BuiltinType& node) { (void)node; }
 
-void AstAnalyser::visit(BuiltinType& node){
-    (void)node;
-}
+void AstAnalyser::visit(PointerType& node) { (void)node; }
 
+void AstAnalyser::visit(FuncType& node) { (void)node; }
 
-void AstAnalyser::visit(PointerType& node){
-    (void)node;
-}
-
-void AstAnalyser::visit(FuncType&  node){
-    (void)node;
-}
-
-void AstAnalyser::visit(ArrayType& node){
-    (void)node;
-}
+void AstAnalyser::visit(ArrayType& node) { (void)node; }

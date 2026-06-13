@@ -51,13 +51,19 @@ Details in [`specs/codegen.md`](specs/codegen.md).
 
 ## Build
 
-Requires `g++` with C++23 support.
+Requires CMake (≥ 3.20) and a C++23 compiler (`g++`/`clang++`).
 
 ```sh
-make          # debug build  -> bin/comp
-make release  # optimized build
-make clean
+cmake -B build                  # configure (Debug by default) -> build/
+cmake --build build             # compile -> bin/comp
+ctest --test-dir build          # run the self-checking test suite
+cmake --build build --target run        # build + run the structs example
+
+cmake -B build -DCMAKE_BUILD_TYPE=Release   # optimized build
+cmake -B build -DENABLE_SANITIZERS=ON       # ASan + UBSan build
 ```
+
+Everything CMake generates lives in `build/`; remove it with `rm -rf build`.
 
 ## Usage
 

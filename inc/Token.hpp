@@ -5,7 +5,7 @@
 #include <string>
 #include <string_view>
 
-enum class TokenKind{
+enum class TokenKind {
     Int,
     Float,
     Char,
@@ -14,59 +14,58 @@ enum class TokenKind{
     True,
     False,
     Null,
-    Inf,        // float +infinity literal
-    Nan,        // float NaN literal
+    Inf, // float +infinity literal
+    Nan, // float NaN literal
 
-    Plus,       // +
-    PlusPlus,   // ++
-    Minus,      // -
-    MinusMinus, // --
-    Star,       // *
-    Slash,      // /
-    Perc,       // %
-    PlusAssign, // +=
-    MinusAssign,// -=
-    StarAssign, // *=
-    SlashAssign,// /=
-    PercAssign, // %=
-    
-    Excl,               // !
-    Tilda,              // ~
-    LessLess,           // <<
-    GreatGreat,         // >>
-    Amper,              // &
-    Pipe,               // |
-    Carret,             // ^
-    CarretAssign,       // ^=
-    AmperAssign,        // &=
-    PipeAssign,         // |=
-    LessLessAssign,     // <<=
-    GreatGreatAssign,   // >>=
+    Plus,        // +
+    PlusPlus,    // ++
+    Minus,       // -
+    MinusMinus,  // --
+    Star,        // *
+    Slash,       // /
+    Perc,        // %
+    PlusAssign,  // +=
+    MinusAssign, // -=
+    StarAssign,  // *=
+    SlashAssign, // /=
+    PercAssign,  // %=
 
-    AmperAmper,     // &&
-    PipePipe,       // ||
-    Less,           // <
-    Great,          // >
-    LessAssign,     // <=
-    GreatAssign,    // >=
-    AssignAssign,   // ==
-    ExclAssign,     // !=
+    Excl,             // !
+    Tilda,            // ~
+    LessLess,         // <<
+    GreatGreat,       // >>
+    Amper,            // &
+    Pipe,             // |
+    Carret,           // ^
+    CarretAssign,     // ^=
+    AmperAssign,      // &=
+    PipeAssign,       // |=
+    LessLessAssign,   // <<=
+    GreatGreatAssign, // >>=
 
-    Assign,     // =
-    Comma,      // ,
-    Dot,        // .
-    Ellipsis,   // ...
-    Arrow,      // ->
-    Question,   // ?
-    Colon,      // :
-    Semicolon,  // ;
-    LPar,       // (
-    RPar,       // )
-    LBlock,     // {
-    RBlock,     // }
-    LBracket,   // [
-    RBracket,   // ]
+    AmperAmper,   // &&
+    PipePipe,     // ||
+    Less,         // <
+    Great,        // >
+    LessAssign,   // <=
+    GreatAssign,  // >=
+    AssignAssign, // ==
+    ExclAssign,   // !=
 
+    Assign,    // =
+    Comma,     // ,
+    Dot,       // .
+    Ellipsis,  // ...
+    Arrow,     // ->
+    Question,  // ?
+    Colon,     // :
+    Semicolon, // ;
+    LPar,      // (
+    RPar,      // )
+    LBlock,    // {
+    RBlock,    // }
+    LBracket,  // [
+    RBracket,  // ]
 
     Sizeof,
     Typeid,
@@ -102,18 +101,13 @@ enum class TokenKind{
     ShortK,
     LongK,
     UIntK,
-    
 
     Invalid,
     Eof
 };
 
-
-
-struct Token{ 
+struct Token {
     TokenKind kind;         // Type of token
     std::string_view data;  // Place of token and size from input
     std::size_t offset = 0; // Place in code
 };
-
-

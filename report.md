@@ -47,10 +47,10 @@ generator) through a classic `accept`/`visit` interface.
 
 ## Build and run
 
-Requirements: `g++` (C++23), `make`, `nasm`, `gcc` (linker).
+Requirements: CMake (≥ 3.20), a C++23 compiler, `nasm`, `gcc` (linker).
 
 ```sh
-make build                  # build the compiler into bin/comp
+cmake -B build && cmake --build build      # compile -> bin/comp
 bin/comp examples/structs.mpl -o structs   # compile + assemble + link
 ./structs
 
@@ -63,10 +63,9 @@ bin/comp prog.mpl -E        # preprocess to stdout
 The driver mirrors `gcc`: with no `-S`/`-c`/`-E` it compiles, assembles
 (`nasm -felf64`) and links (`gcc -no-pie … -lm`) a runnable executable,
 defaulting to `a.out`; intermediates go to the temp dir and are auto-removed.
-Other make targets: `debug` (default, `-g`), `release` (`-O3`), `run`
-(compiles and runs an example), `clean`. Full CLI:
-`comp [options] <file.mpl>` with `-o`, `-S`, `-c`, `-E`, `--dump-tokens`,
-`--dump-ast`, `-h`.
+CMake options: `-DCMAKE_BUILD_TYPE=Release`, `-DENABLE_SANITIZERS=ON`; targets
+`ctest` (test suite) and `--target run`. Full CLI: `comp [options] <file.mpl>`
+with `-o`, `-S`, `-c`, `-E`, `--dump-tokens`, `--dump-ast`, `-h`.
 
 ## Implemented extras (допы)
 
@@ -80,6 +79,10 @@ Codes follow `points.md` (v2.0).
 - **A.1.8** implicit conversions via the cast matrix — including int↔float
   (inserted `cvtsi2sd`/`cvttsd2si` at init/assign/operands/args/return) and
   normalization to `bool` (0/1)
+- **A.1.9** extended operators — bitwise `& | ^ ~`, shifts `<< >>`, all
+  compound assignments (`+= … >>=`), `++`/`--`. Shifts run on 64-bit
+  registers, so the count is taken mod 64; right shift is arithmetic for
+  signed, logical for `uint`
 - **A.1.13** metafunctions — compile-time `sizeof(type|expr)` (operand not
   evaluated), `typeid(expr)`
 - **A.2.18** pointers — `&`/`*`, pointer arithmetic with element scaling,

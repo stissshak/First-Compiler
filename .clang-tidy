@@ -1,0 +1,22 @@
+# Focused bug-finding checks for the MPL compiler. Opinionated style/layout
+# checks are disabled: the AST nodes are intentionally public-data structs, the
+# visitors are private overrides of a public interface, and includes are grouped
+# by hand.
+Checks: >
+  bugprone-*,
+  performance-*,
+  clang-analyzer-*,
+  misc-definitions-in-headers,
+  misc-misplaced-const,
+  misc-redundant-expression,
+  misc-unused-using-decls,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-narrowing-conversions,
+  -bugprone-branch-clone,
+  -bugprone-switch-missing-default-case,
+  -bugprone-throwing-static-initialization,
+  -performance-enum-size,
+  -performance-avoid-endl
+WarningsAsErrors: ''
+HeaderFilterRegex: '(inc|src)/.*'
+FormatStyle: file

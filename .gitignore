@@ -2,11 +2,21 @@
 *.c
 *.s
 *.txt
+!CMakeLists.txt
 .vscode/
 tmp/
 obj/
 bin/
 rofl/
+build/
+build-san/
+
+# stray in-source CMake output (out-of-source build/ is the norm)
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+CTestTestfile.cmake
+compile_commands.json
 
 *.asm
 *.o

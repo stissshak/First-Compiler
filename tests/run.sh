@@ -3,8 +3,13 @@
 # links, runs, exits 0, and prints no line containing "FAIL".
 set -u
 cd "$(dirname "$0")/.."
-COMP=./bin/comp
-[ -x "$COMP" ] && make >/dev/null 2>&1 || make
+# COMP may be set by the caller (e.g. ctest points it at the CMake build);
+# otherwise default to bin/comp and build it with CMake if it's missing.
+COMP="${COMP:-./bin/comp}"
+if [ ! -x "$COMP" ]; then
+    cmake -B build >/dev/null 2>&1 && cmake --build build >/dev/null 2>&1 \
+        || { echo "could not build $COMP"; exit 1; }
+fi
 
 pass=0; fail=0
 for src in $(find tests -name '*.mpl' | sort); do

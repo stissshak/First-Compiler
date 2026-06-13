@@ -4,15 +4,16 @@
 
 #include "Token.hpp"
 
-#include <vector>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
-class Lexer{
-public:
-    Lexer(std::string_view str) : raw(str), pos(0), len(str.length()){}
+class Lexer {
+  public:
+    Lexer(std::string_view str) : raw(str), pos(0), len(str.length()) {}
     std::vector<Token> tokenize();
-private:
+
+  private:
     bool is_end() const;
     bool start_num() const;
     char peek() const;
@@ -35,46 +36,46 @@ static constexpr std::string_view metachars = "+-*/%=!~<>&|^,.-?;:(){}[]";
 static const std::unordered_map<std::string_view, TokenKind> ops = {
     {"++", TokenKind::PlusPlus},
     {"+=", TokenKind::PlusAssign},
-    {"+",  TokenKind::Plus},
+    {"+", TokenKind::Plus},
 
     {"--", TokenKind::MinusMinus},
     {"-=", TokenKind::MinusAssign},
     {"->", TokenKind::Arrow},
-    {"-",  TokenKind::Minus},
+    {"-", TokenKind::Minus},
 
     {"<<=", TokenKind::LessLessAssign},
     {"<<", TokenKind::LessLess},
     {"<=", TokenKind::LessAssign},
-    {"<",  TokenKind::Less},
+    {"<", TokenKind::Less},
 
     {">>=", TokenKind::GreatGreatAssign},
     {">>", TokenKind::GreatGreat},
     {">=", TokenKind::GreatAssign},
-    {">",  TokenKind::Great},
+    {">", TokenKind::Great},
 
     {"==", TokenKind::AssignAssign},
-    {"=",  TokenKind::Assign},
+    {"=", TokenKind::Assign},
 
     {"!=", TokenKind::ExclAssign},
-    {"!",  TokenKind::Excl},
+    {"!", TokenKind::Excl},
 
     {"&&", TokenKind::AmperAmper},
     {"&=", TokenKind::AmperAssign},
-    {"&",  TokenKind::Amper},
+    {"&", TokenKind::Amper},
 
     {"||", TokenKind::PipePipe},
     {"|=", TokenKind::PipeAssign},
-    {"|",  TokenKind::Pipe},
+    {"|", TokenKind::Pipe},
 
     {"^=", TokenKind::CarretAssign},
-    {"^",  TokenKind::Carret},
-    {"~",  TokenKind::Tilda},
+    {"^", TokenKind::Carret},
+    {"~", TokenKind::Tilda},
 
-    {"*",  TokenKind::Star},
+    {"*", TokenKind::Star},
     {"*=", TokenKind::StarAssign},
     {"/=", TokenKind::SlashAssign},
-    {"/",  TokenKind::Slash},
-    {"%",  TokenKind::Perc},
+    {"/", TokenKind::Slash},
+    {"%", TokenKind::Perc},
     {"%=", TokenKind::PercAssign},
 
     {",", TokenKind::Comma},
@@ -92,43 +93,21 @@ static const std::unordered_map<std::string_view, TokenKind> ops = {
 };
 
 static const std::unordered_map<std::string_view, TokenKind> keys = {
-    {"sizeof", TokenKind::Sizeof},
-    {"typeid", TokenKind::Typeid},
-    {"typedef", TokenKind::Typedef},
-    {"const", TokenKind::Const},
-    {"static", TokenKind::Static},
-    
-    {"if", TokenKind::If},
-    {"else", TokenKind::Else},
+    {"sizeof", TokenKind::Sizeof}, {"typeid", TokenKind::Typeid}, {"typedef", TokenKind::Typedef},
+    {"const", TokenKind::Const},   {"static", TokenKind::Static},
 
-    {"for",  TokenKind::For},
-    {"do", TokenKind::Do},
-    {"while", TokenKind::While},
-    {"switch", TokenKind::Switch},
-    {"case", TokenKind::Case},
-    {"default", TokenKind::Default},
-    {"return", TokenKind::Return},
-    {"break", TokenKind::Break},
-    {"continue", TokenKind::Continue},
+    {"if", TokenKind::If},         {"else", TokenKind::Else},
 
-    {"true", TokenKind::True},
-    {"false", TokenKind::False},
-    {"null", TokenKind::Null},
-    {"inf", TokenKind::Inf},
-    {"nan", TokenKind::Nan},
+    {"for", TokenKind::For},       {"do", TokenKind::Do},         {"while", TokenKind::While},
+    {"switch", TokenKind::Switch}, {"case", TokenKind::Case},     {"default", TokenKind::Default},
+    {"return", TokenKind::Return}, {"break", TokenKind::Break},   {"continue", TokenKind::Continue},
 
-    {"int", TokenKind::IntK},
-    {"float", TokenKind::FloatK},
-    {"char", TokenKind::CharK},
-    {"void", TokenKind::VoidK},
-    {"bool", TokenKind::BoolK},
-    {"byte", TokenKind::ByteK},
-    {"short", TokenKind::ShortK},
-    {"long", TokenKind::LongK},
-    {"uint", TokenKind::UIntK},
+    {"true", TokenKind::True},     {"false", TokenKind::False},   {"null", TokenKind::Null},
+    {"inf", TokenKind::Inf},       {"nan", TokenKind::Nan},
 
-    {"extern", TokenKind::Extern},
-    {"struct", TokenKind::Struct},
-    {"enum", TokenKind::Enum},
-    {"union", TokenKind::Union}
-};
+    {"int", TokenKind::IntK},      {"float", TokenKind::FloatK},  {"char", TokenKind::CharK},
+    {"void", TokenKind::VoidK},    {"bool", TokenKind::BoolK},    {"byte", TokenKind::ByteK},
+    {"short", TokenKind::ShortK},  {"long", TokenKind::LongK},    {"uint", TokenKind::UIntK},
+
+    {"extern", TokenKind::Extern}, {"struct", TokenKind::Struct}, {"enum", TokenKind::Enum},
+    {"union", TokenKind::Union}};

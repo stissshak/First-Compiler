@@ -1,10 +1,10 @@
-//MPL/src/AstPrinter.cpp
+// MPL/src/AstPrinter.cpp
 
 #include <iostream>
 #include <vector>
 
-#include "AstPrinter.hpp"
 #include "Ast.hpp"
+#include "AstPrinter.hpp"
 
 void AstPrinter::printIndent(bool last) {
     for (int i = 0; i < (int)isLast.size() - 1; ++i) {
@@ -15,28 +15,35 @@ void AstPrinter::printIndent(bool last) {
     }
 }
 
-void AstPrinter::enter(bool last) {
-    isLast.push_back(last);
-}
+void AstPrinter::enter(bool last) { isLast.push_back(last); }
 
-void AstPrinter::leave() {
-    isLast.pop_back();
-}
+void AstPrinter::leave() { isLast.pop_back(); }
 
 std::string AstPrinter::typeName(Type* type) {
-    if (!type) return "null";
+    if (!type)
+        return "null";
     if (auto* b = dynamic_cast<BuiltinType*>(type)) {
         switch (b->type) {
-            case BuiltinTypes::Int:   return "int";
-            case BuiltinTypes::UInt:  return "uint";
-            case BuiltinTypes::Short: return "short";
-            case BuiltinTypes::Long:  return "long";
-            case BuiltinTypes::Float: return "float";
-            case BuiltinTypes::Char:  return "char";
-            case BuiltinTypes::Void:  return "void";
-            case BuiltinTypes::Bool:  return "bool";
-            case BuiltinTypes::Byte:  return "byte";
-            case BuiltinTypes::Custom: return std::string{b->name};
+        case BuiltinTypes::Int:
+            return "int";
+        case BuiltinTypes::UInt:
+            return "uint";
+        case BuiltinTypes::Short:
+            return "short";
+        case BuiltinTypes::Long:
+            return "long";
+        case BuiltinTypes::Float:
+            return "float";
+        case BuiltinTypes::Char:
+            return "char";
+        case BuiltinTypes::Void:
+            return "void";
+        case BuiltinTypes::Bool:
+            return "bool";
+        case BuiltinTypes::Byte:
+            return "byte";
+        case BuiltinTypes::Custom:
+            return std::string{b->name};
         }
     }
     if (auto* p = dynamic_cast<PointerType*>(type)) {
@@ -50,58 +57,95 @@ std::string AstPrinter::typeName(Type* type) {
 
 std::string AstPrinter::binaryOpName(BinaryOp op) {
     switch (op) {
-        case BinaryOp::Add:          return "+";
-        case BinaryOp::Sub:          return "-";
-        case BinaryOp::Mul:          return "*";
-        case BinaryOp::Div:          return "/";
-        case BinaryOp::Mod:          return "%";
-        case BinaryOp::BitOr:        return "|";
-        case BinaryOp::BitAnd:       return "&";
-        case BinaryOp::BitXor:       return "^";
-        case BinaryOp::Shl:          return "<<";
-        case BinaryOp::Shr:          return ">>";
-        case BinaryOp::Less:         return "<";
-        case BinaryOp::Greater:      return ">";
-        case BinaryOp::LessEqual:    return "<=";
-        case BinaryOp::GreaterEqual: return ">=";
-        case BinaryOp::Equal:        return "==";
-        case BinaryOp::NotEqual:     return "!=";
-        case BinaryOp::And:          return "&&";
-        case BinaryOp::Or:           return "||";
-        case BinaryOp::Assign:       return "=";
-        case BinaryOp::AddAssign:    return "+=";
-        case BinaryOp::MinusAssign:  return "-=";
-        case BinaryOp::MulAssign:    return "*=";
-        case BinaryOp::DivAssign:    return "/=";
-        case BinaryOp::ModAssign:    return "%=";
-        case BinaryOp::BitOrAssign:  return "|=";
-        case BinaryOp::BitAndAssign: return "&=";
-        case BinaryOp::BitXorAssign: return "^=";
-        case BinaryOp::ShlAssign:    return "<<=";
-        case BinaryOp::ShrAssign:    return ">>=";
+    case BinaryOp::Add:
+        return "+";
+    case BinaryOp::Sub:
+        return "-";
+    case BinaryOp::Mul:
+        return "*";
+    case BinaryOp::Div:
+        return "/";
+    case BinaryOp::Mod:
+        return "%";
+    case BinaryOp::BitOr:
+        return "|";
+    case BinaryOp::BitAnd:
+        return "&";
+    case BinaryOp::BitXor:
+        return "^";
+    case BinaryOp::Shl:
+        return "<<";
+    case BinaryOp::Shr:
+        return ">>";
+    case BinaryOp::Less:
+        return "<";
+    case BinaryOp::Greater:
+        return ">";
+    case BinaryOp::LessEqual:
+        return "<=";
+    case BinaryOp::GreaterEqual:
+        return ">=";
+    case BinaryOp::Equal:
+        return "==";
+    case BinaryOp::NotEqual:
+        return "!=";
+    case BinaryOp::And:
+        return "&&";
+    case BinaryOp::Or:
+        return "||";
+    case BinaryOp::Assign:
+        return "=";
+    case BinaryOp::AddAssign:
+        return "+=";
+    case BinaryOp::MinusAssign:
+        return "-=";
+    case BinaryOp::MulAssign:
+        return "*=";
+    case BinaryOp::DivAssign:
+        return "/=";
+    case BinaryOp::ModAssign:
+        return "%=";
+    case BinaryOp::BitOrAssign:
+        return "|=";
+    case BinaryOp::BitAndAssign:
+        return "&=";
+    case BinaryOp::BitXorAssign:
+        return "^=";
+    case BinaryOp::ShlAssign:
+        return "<<=";
+    case BinaryOp::ShrAssign:
+        return ">>=";
     }
     return "?";
 }
 
 std::string AstPrinter::unaryOpName(UnaryOp op) {
     switch (op) {
-        case UnaryOp::Pos:       return "+";
-        case UnaryOp::Neg:       return "-";
-        case UnaryOp::Not:       return "!";
-        case UnaryOp::AddressOf: return "&";
-        case UnaryOp::Deref:     return "*";
-        case UnaryOp::BitNot:    return "!";
-        case UnaryOp::PreInc:    return "++ (pre)";
-        case UnaryOp::PreDec:    return "-- (pre)";
-        case UnaryOp::PostInc:   return "++ (post)";
-        case UnaryOp::PostDec:   return "-- (post)";
+    case UnaryOp::Pos:
+        return "+";
+    case UnaryOp::Neg:
+        return "-";
+    case UnaryOp::Not:
+        return "!";
+    case UnaryOp::AddressOf:
+        return "&";
+    case UnaryOp::Deref:
+        return "*";
+    case UnaryOp::BitNot:
+        return "!";
+    case UnaryOp::PreInc:
+        return "++ (pre)";
+    case UnaryOp::PreDec:
+        return "-- (pre)";
+    case UnaryOp::PostInc:
+        return "++ (post)";
+    case UnaryOp::PostDec:
+        return "-- (post)";
     }
     return "?";
 }
 
-void AstPrinter::print(TranslationUnit& unit) {
-    unit.accept(*this);
-}
+void AstPrinter::print(TranslationUnit& unit) { unit.accept(*this); }
 
 //----------------------------------------
 // Decl
@@ -117,7 +161,7 @@ void AstPrinter::visit(TranslationUnit& node) {
     }
 }
 
-void AstPrinter::visit(StructDecl& node){
+void AstPrinter::visit(StructDecl& node) {
     std::cout << "StructDecl '" << node.name << "'\n";
     {
         bool last = false;
@@ -137,12 +181,11 @@ void AstPrinter::visit(StructDecl& node){
             }
             leave();
         }
-    } 
+    }
 }
 
 void AstPrinter::visit(FuncDecl& node) {
-    std::cout << "FuncDecl '" << node.name
-              << "' -> " << typeName(node.returnType.get()) << "\n";
+    std::cout << "FuncDecl '" << node.name << "' -> " << typeName(node.returnType.get()) << "\n";
 
     // params
     {
@@ -169,14 +212,14 @@ void AstPrinter::visit(FuncDecl& node) {
     {
         printIndent(true);
         enter(true);
-        if(node.body) node.body->accept(*this);
+        if (node.body)
+            node.body->accept(*this);
         leave();
     }
 }
 
 void AstPrinter::visit(VarDecl& node) {
-    std::cout << "VarDecl '" << node.name
-              << "' : " << typeName(node.type.get());
+    std::cout << "VarDecl '" << node.name << "' : " << typeName(node.type.get());
     if (node.init) {
         std::cout << "\n";
         printIndent(true);
@@ -226,24 +269,30 @@ void AstPrinter::visit(IfStmt& node) {
     printIndent(false);
     std::cout << "Cond\n";
     enter(false);
-    printIndent(true); enter(true);
+    printIndent(true);
+    enter(true);
     node.cond->accept(*this);
-    leave(); leave();
+    leave();
+    leave();
 
     printIndent(!hasElse);
     std::cout << "Then\n";
     enter(!hasElse);
-    printIndent(true); enter(true);
+    printIndent(true);
+    enter(true);
     node.thenPart->accept(*this);
-    leave(); leave();
+    leave();
+    leave();
 
     if (hasElse) {
         printIndent(true);
         std::cout << "Else\n";
         enter(true);
-        printIndent(true); enter(true);
+        printIndent(true);
+        enter(true);
         node.elsePart->accept(*this);
-        leave(); leave();
+        leave();
+        leave();
     }
 }
 
@@ -253,16 +302,20 @@ void AstPrinter::visit(WhileStmt& node) {
     printIndent(false);
     std::cout << "Cond\n";
     enter(false);
-    printIndent(true); enter(true);
+    printIndent(true);
+    enter(true);
     node.cond->accept(*this);
-    leave(); leave();
+    leave();
+    leave();
 
     printIndent(true);
     std::cout << "Body\n";
     enter(true);
-    printIndent(true); enter(true);
+    printIndent(true);
+    enter(true);
     node.body->accept(*this);
-    leave(); leave();
+    leave();
+    leave();
 }
 
 void AstPrinter::visit(ForStmt& node) {
@@ -273,14 +326,16 @@ void AstPrinter::visit(ForStmt& node) {
     std::cout << "Init\n";
     enter(false);
     if (node.initDecl) {
-        printIndent(true); enter(true);
+        printIndent(true);
+        enter(true);
         node.initDecl->accept(*this);
         leave();
-    } else if(node.initStmt){
-        printIndent(true); enter(true);
+    } else if (node.initStmt) {
+        printIndent(true);
+        enter(true);
         node.initStmt->accept(*this);
         leave();
-    }else{
+    } else {
         printIndent(true);
         std::cout << "(empty)\n";
     }
@@ -291,7 +346,8 @@ void AstPrinter::visit(ForStmt& node) {
     std::cout << "Cond\n";
     enter(false);
     if (node.cond) {
-        printIndent(true); enter(true);
+        printIndent(true);
+        enter(true);
         node.cond->accept(*this);
         leave();
     } else {
@@ -305,7 +361,8 @@ void AstPrinter::visit(ForStmt& node) {
     std::cout << "Incr\n";
     enter(false);
     if (node.incr) {
-        printIndent(true); enter(true);
+        printIndent(true);
+        enter(true);
         node.incr->accept(*this);
         leave();
     } else {
@@ -318,9 +375,11 @@ void AstPrinter::visit(ForStmt& node) {
     printIndent(true);
     std::cout << "Body\n";
     enter(true);
-    printIndent(true); enter(true);
+    printIndent(true);
+    enter(true);
     node.body->accept(*this);
-    leave(); leave();
+    leave();
+    leave();
 }
 
 void AstPrinter::visit(ReturnStmt& node) {
@@ -333,7 +392,7 @@ void AstPrinter::visit(ReturnStmt& node) {
     }
 }
 
-void AstPrinter::visit(BreakStmt&)    { std::cout << "BreakStmt\n"; }
+void AstPrinter::visit(BreakStmt&) { std::cout << "BreakStmt\n"; }
 void AstPrinter::visit(ContinueStmt&) { std::cout << "ContinueStmt\n"; }
 
 //----------------------------------------
@@ -369,9 +428,11 @@ void AstPrinter::visit(CallExpr& node) {
     printIndent(!hasArgs);
     std::cout << "Func\n";
     enter(!hasArgs);
-    printIndent(true); enter(true);
+    printIndent(true);
+    enter(true);
     node.func->accept(*this);
-    leave(); leave();
+    leave();
+    leave();
 
     if (hasArgs) {
         printIndent(true);
@@ -403,22 +464,25 @@ void AstPrinter::visit(IndexExpr& node) {
     printIndent(false);
     std::cout << "Array\n";
     enter(false);
-    printIndent(true); enter(true);
+    printIndent(true);
+    enter(true);
     node.arr->accept(*this);
-    leave(); leave();
+    leave();
+    leave();
 
     printIndent(true);
     std::cout << "Index\n";
     enter(true);
-    printIndent(true); enter(true);
+    printIndent(true);
+    enter(true);
     node.index->accept(*this);
-    leave(); leave();
+    leave();
+    leave();
 }
 
 void AstPrinter::visit(AccessExpr& node) {
-    std::cout << "AccessExpr "
-              << (node.kind == AccessKind::Dot ? "." : "->")
-              << " '" << node.field << "'\n";
+    std::cout << "AccessExpr " << (node.kind == AccessKind::Dot ? "." : "->") << " '" << node.field
+              << "'\n";
     printIndent(true);
     enter(true);
     node.object->accept(*this);
@@ -426,7 +490,7 @@ void AstPrinter::visit(AccessExpr& node) {
 }
 
 void AstPrinter::visit(SizeofExpr& node) {
-    if(node.target){
+    if (node.target) {
         std::cout << "SizeofExpr -> " << typeName(node.target.get()) << "\n";
         return;
     }
@@ -445,37 +509,23 @@ void AstPrinter::visit(TypeidExpr& node) {
     leave();
 }
 
-void AstPrinter::visit(IntLiteral& node) {
-    std::cout << "IntLiteral " << node.value << "\n";
-}
+void AstPrinter::visit(IntLiteral& node) { std::cout << "IntLiteral " << node.value << "\n"; }
 
-void AstPrinter::visit(FloatLiteral& node) {
-    std::cout << "FloatLiteral " << node.value << "\n";
-}
+void AstPrinter::visit(FloatLiteral& node) { std::cout << "FloatLiteral " << node.value << "\n"; }
 
-void AstPrinter::visit(CharLiteral& node) {
-    std::cout << "CharLiteral " << node.value << "\n";
-}
+void AstPrinter::visit(CharLiteral& node) { std::cout << "CharLiteral " << node.value << "\n"; }
 
-void AstPrinter::visit(BoolLiteral& node) {
-    std::cout << "BoolLiteral " << node.value << "\n";
-}
+void AstPrinter::visit(BoolLiteral& node) { std::cout << "BoolLiteral " << node.value << "\n"; }
 
-void AstPrinter::visit(NullLiteral&) {
-    std::cout << "NullLiteral\n";
-}
+void AstPrinter::visit(NullLiteral&) { std::cout << "NullLiteral\n"; }
 
 void AstPrinter::visit(StringLiteral& node) {
     std::cout << "StringLiteral \"" << node.value << "\"\n";
 }
 
-void AstPrinter::visit(Identifier& node) {
-    std::cout << "Identifier '" << node.name << "'\n";
-}
-
-
+void AstPrinter::visit(Identifier& node) { std::cout << "Identifier '" << node.name << "'\n"; }
 
 void AstPrinter::visit(BuiltinType&) { std::cout << "BuiltinType\n"; }
 void AstPrinter::visit(PointerType&) { std::cout << "PointerType\n"; }
-void AstPrinter::visit(ArrayType&) {std::cout << "ArrayType\n"; }
-void AstPrinter::visit(FuncType&) {std::cout << "FuncType\n";}
+void AstPrinter::visit(ArrayType&) { std::cout << "ArrayType\n"; }
+void AstPrinter::visit(FuncType&) { std::cout << "FuncType\n"; }
