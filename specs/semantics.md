@@ -59,9 +59,18 @@ non-zero is true.
   functions can be declared (for libc: `printf`, `scanf`) but not defined in
   MPL.
 - Recursion is allowed.
+- **Overloading** — several functions may share a name if their parameter
+  signatures differ. A call resolves to the overload whose parameters match the
+  argument types **exactly** (no implicit conversions are used to choose between
+  candidates); zero matches or more than one is a compile error. When a name has
+  a single definition the call behaves like an ordinary call (arguments convert
+  normally). Redefining the same signature is an error. Symbols are name-mangled
+  by parameter types so overloads link distinctly; `main` and `extern` functions
+  keep their exact name for C linkage.
 - A function name used as a value denotes the function's address and has the
   function type (`int(int, int) f = add;`). Calls through such variables are
-  indirect calls; the signature must match exactly.
+  indirect calls; the signature must match exactly. Taking the address of an
+  *overloaded* name is an error (no context to pick an overload).
 - Structs may be passed and returned **through pointers only**; passing a
   struct by value is not implemented (known limitation).
 

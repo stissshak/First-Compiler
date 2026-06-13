@@ -499,11 +499,12 @@ static void assignParamOffsets(FuncDecl& node, FuncInfo& f) {
 
 void CodeGenerator::emitFunction(FuncDecl& node) {
     uint32_t alignedN = (current.frameSize + 15) & ~15u;
+    const std::string& sym = node.mangled; // type-suffixed for overloads
     textBuf += "global ";
-    textBuf += node.name;
+    textBuf += sym;
     textBuf += '\n';
 
-    textBuf += node.name;
+    textBuf += sym;
     textBuf += ":\n";
 
     textBuf += "\tpush rbp\n";
@@ -514,7 +515,7 @@ void CodeGenerator::emitFunction(FuncDecl& node) {
     textBuf += current.body;
 
     textBuf += ".Lreturn_";
-    textBuf += node.name;
+    textBuf += sym;
     textBuf += ":\n";
     textBuf += "\tleave\n";
     textBuf += "\tret\n\n";
@@ -524,13 +525,13 @@ void CodeGenerator::visit(FuncDecl& node) {
     funcs[node.name] = &node;
     if (!node.body) {
         if (node.isExtern)
-            textBuf += "extern " + std::string(node.name) + "\n";
+            textBuf += "extern " + node.mangled + "\n";
         return;
     }
 
     current = FuncInfo{};
     initFreeRegs(current);
-    current.name = node.name;
+    current.name = node.mangled;
     assignParamOffsets(node, current);
 
     node.body->accept(*this);
@@ -977,7 +978,9 @@ void CodeGenerator::visit(CallExpr& node) {
 
     std::string callee = direct ? std::string(id->name) : "";
     bool isPanic = false;
-    if (direct && !funcs.count(id->name)) {
+    if (direct && !id->resolvedSym.empty()) {
+        callee = id->resolvedSym; // resolved user overload or extern (exact name)
+    } else if (direct && !funcs.count(id->name)) {
         if (callee == "print")
             callee = "printf";
         else if (callee == "input")
@@ -1232,9 +1235,9 @@ void CodeGenerator::visit(StringLiteral& node) {
 }
 
 void CodeGenerator::visit(Identifier& node) {
-    if (!findVar(node.name) && funcs.count(node.name)) {
+    if (!findVar(node.name) && !node.resolvedSym.empty()) { // function address
         Reg r = alloc();
-        current.body += "\tlea " + R(r) + ", [rel " + std::string(node.name) + "]\n";
+        current.body += "\tlea " + R(r) + ", [rel " + node.resolvedSym + "]\n";
         resultReg = r;
         return;
     }

@@ -85,6 +85,10 @@ Codes follow `points.md` (v2.0).
   signed, logical for `uint`
 - **A.1.13** metafunctions — compile-time `sizeof(type|expr)` (operand not
   evaluated), `typeid(expr)`
+- **A.2.8** function overloading — one name, several parameter signatures;
+  resolution by exact parameter match (no implicit conversions used to choose
+  between candidates). Symbols are type-mangled (`add` → `add_ii`); `main` and
+  `extern` libc names keep their exact name
 - **A.2.18** pointers — `&`/`*`, pointer arithmetic with element scaling,
   multi-level pointers, pointer casts, `const int*` vs `int* const`
 - **A.3.9** (extends A.2.18) raw/generic pointers — `void*` ↔ any pointer,

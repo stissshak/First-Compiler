@@ -13,10 +13,15 @@ struct varInfo {
     bool isConst = false;
 };
 
-struct funcInfo {
+struct funcOverload {
     FuncType* funcType;
     bool isDefined = false;
     bool isExtern = false;
+    std::string mangled; // emitted symbol; empty for builtins (no FuncDecl)
+};
+
+struct funcInfo {
+    std::vector<funcOverload> overloads; // A.2.8: one name, several signatures
 };
 
 struct strctInfo {
@@ -37,6 +42,58 @@ strctInfo* lookupStruct(std::string_view name, Scope* curScope);
 static bool isByte(Type* t) {
     auto b = dynamic_cast<BuiltinType*>(t);
     return b && b->type == BuiltinTypes::Byte;
+}
+
+// short code for a type, used to build unique overload symbols
+static std::string mangleType(Type* t) {
+    if (auto b = dynamic_cast<BuiltinType*>(t)) {
+        switch (b->type) {
+        case BuiltinTypes::Int:
+            return "i";
+        case BuiltinTypes::UInt:
+            return "j";
+        case BuiltinTypes::Short:
+            return "s";
+        case BuiltinTypes::Long:
+            return "l";
+        case BuiltinTypes::Float:
+            return "f";
+        case BuiltinTypes::Char:
+            return "c";
+        case BuiltinTypes::Bool:
+            return "b";
+        case BuiltinTypes::Byte:
+            return "y";
+        case BuiltinTypes::Void:
+            return "v";
+        case BuiltinTypes::Custom:
+            return "S" + std::string(b->name);
+        }
+    }
+    if (auto p = dynamic_cast<PointerType*>(t))
+        return "P" + mangleType(p->base.get());
+    if (auto a = dynamic_cast<ArrayType*>(t))
+        return "A" + mangleType(a->elemType.get());
+    if (auto fn = dynamic_cast<FuncType*>(t)) {
+        std::string s = "F" + mangleType(fn->returnType.get());
+        for (auto& p : fn->params)
+            s += mangleType(p.get());
+        return s + "E";
+    }
+    return "X";
+}
+
+// emitted symbol for a function. main and externs keep their exact name (C
+// linkage); every other function is type-suffixed so overloads don't collide.
+static std::string mangleFunc(const FuncDecl& f) {
+    if (f.isExtern || f.name == "main")
+        return std::string(f.name);
+    std::string m = std::string(f.name) + "_";
+    if (f.params.empty())
+        return m + "v";
+    for (auto& p : f.params)
+        m += mangleType(p->type.get());
+    return m;
 }
 
 static bool isFloatTy(Type* t) {
@@ -148,8 +205,8 @@ bool AstAnalyser::analyse(TranslationUnit& unit) {
 // libc-backed builtins
 void AstAnalyser::addBuiltins() {
     auto add = [&](std::string_view name, std::unique_ptr<FuncType> f) {
-        funcInfo fi{f.get()};
-        fi.isExtern = true;
+        funcInfo fi;
+        fi.overloads.push_back({f.get(), true, true, ""}); // no FuncDecl, no symbol
         funcTypes.push_back(std::move(f));
         curScope->symbols.emplace(name, DeclInfo{fi});
     };
@@ -189,7 +246,7 @@ void AstAnalyser::visit(TranslationUnit& node) {
     if (it == curScope->symbols.end())
         err("no 'main' function");
     else if (auto f = std::get_if<funcInfo>(&it->second.info)) {
-        auto rt = dynamic_cast<BuiltinType*>(f->funcType->returnType.get());
+        auto rt = dynamic_cast<BuiltinType*>(f->overloads[0].funcType->returnType.get());
         if (!rt || rt->type != BuiltinTypes::Int)
             err("'main' must return int");
     } else {
@@ -198,8 +255,9 @@ void AstAnalyser::visit(TranslationUnit& node) {
 
     for (auto& [name, di] : curScope->symbols) {
         if (auto f = std::get_if<funcInfo>(&di.info))
-            if (!f->isDefined && !f->isExtern)
-                err("Function '" + std::string(name) + "' is declared but never defined");
+            for (auto& o : f->overloads)
+                if (!o.isDefined && !o.isExtern)
+                    err("Function '" + std::string(name) + "' is declared but never defined");
     }
     delete curScope;
 }
@@ -311,46 +369,56 @@ void AstAnalyser::analyseFuncBody(FuncDecl& node) {
 
 // TODO split 2 for
 void AstAnalyser::visit(FuncDecl& node) {
-    auto f = curScope->symbols.find(node.name);
-    if (f != curScope->symbols.end()) {
-        auto existing = std::get_if<funcInfo>(&f->second.info);
-        if (!existing || existing->isDefined) {
-            err(node, "Func was declarated");
-            return;
-        }
-        if (node.body) {
-            if (existing->isExtern) {
-                err(node, "Extern function cannot be defined");
-                return;
-            }
-            existing->isDefined = true;
-            analyseFuncBody(node);
-        }
-        return;
-    }
+    node.mangled = mangleFunc(node); // same signature -> same symbol
 
     auto ft = std::make_unique<FuncType>();
     ft->returnType = node.returnType->clone();
     ft->variadic = node.variadic;
-
-    for (auto& p : node.params) {
+    for (auto& p : node.params)
         ft->params.push_back(p->type.get()->clone());
-    }
 
-    funcInfo fi{ft.get()};
-    fi.isExtern = node.isExtern;
-    funcTypes.push_back(std::move(ft));
-
-    if (!node.body) {
-        fi.isDefined = false;
-        curScope->symbols.emplace(node.name, DeclInfo(fi));
+    auto f = curScope->symbols.find(node.name);
+    if (f != curScope->symbols.end()) {
+        auto existing = std::get_if<funcInfo>(&f->second.info);
+        if (!existing) {
+            err(node, "Name already declared as a non-function");
+            return;
+        }
+        // an overload with this exact signature already exists?
+        funcOverload* ov = nullptr;
+        for (auto& o : existing->overloads)
+            if (o.mangled == node.mangled) {
+                ov = &o;
+                break;
+            }
+        if (ov) {
+            if (!node.body || ov->isDefined) {
+                err(node, "Func was declarated");
+                return;
+            }
+            if (ov->isExtern) {
+                err(node, "Extern function cannot be defined");
+                return;
+            }
+            ov->isDefined = true;
+            analyseFuncBody(node);
+            return;
+        }
+        // new overload: different parameter signature
+        existing->overloads.push_back(
+            {ft.get(), node.body != nullptr, node.isExtern, node.mangled});
+        funcTypes.push_back(std::move(ft));
+        if (node.body)
+            analyseFuncBody(node);
         return;
     }
 
-    fi.isDefined = true;
+    funcInfo fi;
+    fi.overloads.push_back({ft.get(), node.body != nullptr, node.isExtern, node.mangled});
+    funcTypes.push_back(std::move(ft));
     curScope->symbols.emplace(node.name, DeclInfo(fi));
-
-    analyseFuncBody(node);
+    if (node.body)
+        analyseFuncBody(node);
 }
 
 void AstAnalyser::visit(BlockStmt& node) {
@@ -581,30 +649,97 @@ void AstAnalyser::visit(UnaryExpr& node) {
 }
 
 void AstAnalyser::visit(CallExpr& node) {
+    // direct call to a (possibly overloaded) named function — unless a local
+    // variable of the same name shadows it (then it's an indirect call).
+    auto* id = dynamic_cast<Identifier*>(node.func.get());
+    funcInfo* fi = nullptr;
+    if (id)
+        for (Scope* s = curScope; s; s = s->parent) {
+            auto it = s->symbols.find(id->name);
+            if (it == s->symbols.end())
+                continue;
+            fi = std::get_if<funcInfo>(&it->second.info); // null if it's a variable
+            break;                                        // nearest binding wins
+        }
+
+    if (fi) {
+        std::vector<Type*> argTypes;
+        argTypes.reserve(node.param.size());
+        for (auto& a : node.param) {
+            a->accept(*this);
+            argTypes.push_back(curType);
+        }
+
+        // one candidate: use it (arguments may convert, like an ordinary call).
+        // several: pick the exact match only (A.2.8 — no implicit conversions).
+        funcOverload* chosen = nullptr;
+        if (fi->overloads.size() == 1) {
+            chosen = &fi->overloads[0];
+        } else {
+            int matches = 0;
+            for (auto& o : fi->overloads) {
+                FuncType* ft = o.funcType;
+                bool ok = ft->variadic ? argTypes.size() >= ft->params.size()
+                                       : argTypes.size() == ft->params.size();
+                for (std::size_t i = 0; ok && i < ft->params.size(); ++i)
+                    if (checkCast(argTypes[i], ft->params[i].get()) != castResult::Equal)
+                        ok = false;
+                if (ok) {
+                    chosen = &o;
+                    ++matches;
+                }
+            }
+            if (matches != 1) {
+                err(node,
+                    matches == 0 ? "No matching function overload" : "Ambiguous overloaded call");
+                curType = nullptr;
+                return;
+            }
+        }
+
+        FuncType* ft = chosen->funcType;
+        bool countOk = ft->variadic ? node.param.size() >= ft->params.size()
+                                    : node.param.size() == ft->params.size();
+        if (!countOk) {
+            err(node, "Declarated number of arguments not equal");
+        } else {
+            for (std::size_t i = 0; i < node.param.size(); ++i)
+                if (i < ft->params.size()) {
+                    checkTypes(ft->params[i].get(), argTypes[i], *node.param[i],
+                               "Incompatible argument type");
+                    coerce(node.param[i], ft->params[i].get());
+                }
+        }
+        id->resolvedSym = chosen->mangled;
+        curType = ft->returnType.get();
+        node.resultType = curType->clone();
+        return;
+    }
+
+    // indirect call (through a function-pointer value)
     node.func->accept(*this);
     auto fType = dynamic_cast<FuncType*>(curType);
     if (fType == nullptr) {
         err(node, "Called object is not a function");
         curType = nullptr;
         return;
-    } else {
-        bool countOk = fType->variadic ? node.param.size() >= fType->params.size()
-                                       : node.param.size() == fType->params.size();
-        if (!countOk) {
-            err(node, "Declarated number of arguments not equal");
-        } else {
-            for (std::size_t i = 0; i < node.param.size(); ++i) {
-                node.param[i]->accept(*this);
-                if (i < fType->params.size()) {
-                    checkTypes(fType->params[i].get(), curType, *node.param[i],
-                               "Incompatible argument type");
-                    coerce(node.param[i], fType->params[i].get());
-                }
-            }
-            curType = fType->returnType.get();
-        }
     }
-    node.resultType = curType->clone();
+    bool countOk = fType->variadic ? node.param.size() >= fType->params.size()
+                                   : node.param.size() == fType->params.size();
+    if (!countOk) {
+        err(node, "Declarated number of arguments not equal");
+    } else {
+        for (std::size_t i = 0; i < node.param.size(); ++i) {
+            node.param[i]->accept(*this);
+            if (i < fType->params.size()) {
+                checkTypes(fType->params[i].get(), curType, *node.param[i],
+                           "Incompatible argument type");
+                coerce(node.param[i], fType->params[i].get());
+            }
+        }
+        curType = fType->returnType.get();
+    }
+    node.resultType = curType ? curType->clone() : nullptr;
 }
 
 void AstAnalyser::visit(CastExpr& node) {
@@ -752,7 +887,14 @@ void AstAnalyser::visit(Identifier& node) {
             return;
         }
         if (auto f = std::get_if<funcInfo>(&it->second.info)) {
-            curType = f->funcType;
+            // a function name in value position (e.g. taking its address) must
+            // pick a single overload; with several there's no context to choose.
+            if (f->overloads.size() != 1) {
+                err(node, "Ambiguous reference to overloaded function");
+                return;
+            }
+            curType = f->overloads[0].funcType;
+            node.resolvedSym = f->overloads[0].mangled;
             node.resultType = curType->clone();
             return;
         }

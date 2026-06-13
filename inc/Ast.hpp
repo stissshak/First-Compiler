@@ -55,6 +55,7 @@ struct FuncDecl : Decl {
     std::unique_ptr<Stmt> body;
     bool variadic = false;
     bool isExtern = false;
+    std::string mangled; // emitted symbol (name for main/extern, type-suffixed otherwise)
 
     ACCEPT
 };
@@ -266,6 +267,7 @@ struct NullLiteral : Expr { // void* 0
 
 struct Identifier : Expr {
     std::string_view name;
+    std::string resolvedSym; // when this names a function: the (mangled) symbol to emit
 
     ACCEPT
 };
