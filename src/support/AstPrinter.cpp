@@ -3,8 +3,8 @@
 #include <iostream>
 #include <vector>
 
-#include "Ast.hpp"
-#include "AstPrinter.hpp"
+#include "core/Ast.hpp"
+#include "support/AstPrinter.hpp"
 
 void AstPrinter::printIndent(bool last) {
     for (int i = 0; i < (int)isLast.size() - 1; ++i) {

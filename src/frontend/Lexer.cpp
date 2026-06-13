@@ -1,6 +1,6 @@
 // MPL/src/Lexer.cpp
 
-#include "Lexer.hpp"
+#include "frontend/Lexer.hpp"
 
 #include <cctype>
 

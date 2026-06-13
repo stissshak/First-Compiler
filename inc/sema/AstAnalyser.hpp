@@ -5,10 +5,10 @@
 #include <string>
 #include <vector>
 
-#include "Ast.hpp"
-#include "AstVisitor.hpp"
-#include "Logger.hpp"
-#include "SourceMap.hpp"
+#include "core/Ast.hpp"
+#include "core/AstVisitor.hpp"
+#include "core/SourceMap.hpp"
+#include "support/Logger.hpp"
 
 struct DeclInfo;
 struct Scope;

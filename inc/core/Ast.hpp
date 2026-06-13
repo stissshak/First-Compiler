@@ -340,4 +340,4 @@ struct FuncType : Type {
 // По наполнению зависит от нас, от студентов, многие из узлов содержат указатели на другие узлы
 // decl = func, class, typedef, tampletes, alies
 
-#include "Types.hpp"
+#include "core/Types.hpp"

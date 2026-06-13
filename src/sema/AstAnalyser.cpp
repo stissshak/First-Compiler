@@ -5,7 +5,7 @@
 #include <stack>
 #include <unordered_map>
 
-#include "AstAnalyser.hpp"
+#include "sema/AstAnalyser.hpp"
 
 struct varInfo {
     Type* varType;

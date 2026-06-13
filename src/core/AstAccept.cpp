@@ -1,5 +1,5 @@
-#include "Ast.hpp"
-#include "AstVisitor.hpp"
+#include "core/Ast.hpp"
+#include "core/AstVisitor.hpp"
 
 // #define ACCEPT(nodeName) void nodeName::accept(AstVisitor& v) { v.visit(*this); }
 

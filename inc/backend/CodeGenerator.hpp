@@ -11,9 +11,9 @@
 #include <unordered_set>
 #include <vector>
 
-#include "Ast.hpp"
-#include "AstVisitor.hpp"
-#include "SourceMap.hpp"
+#include "core/Ast.hpp"
+#include "core/AstVisitor.hpp"
+#include "core/SourceMap.hpp"
 
 enum class Section : uint8_t { Bss, Data, Rodata, Text };
 enum class Storage : uint8_t { Global, Stack, Register };

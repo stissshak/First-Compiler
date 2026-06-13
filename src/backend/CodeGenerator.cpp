@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "CodeGenerator.hpp"
+#include "backend/CodeGenerator.hpp"
 
 static const char* regName(Reg r, uint32_t size = 8) {
     static const char* n8[16] = {"al",  "bl",  "cl",   "dl",   "sil",  "dil",  "spl",  "bpl",

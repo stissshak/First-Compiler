@@ -7,8 +7,8 @@
 #include <string>
 #include <unordered_set>
 
-#include "Input.hpp"
-#include "SourceMap.hpp"
+#include "core/SourceMap.hpp"
+#include "frontend/Input.hpp"
 
 class Preprocessor {
   public:

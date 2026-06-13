@@ -5,8 +5,8 @@
 #include <string>
 #include <vector>
 
-#include "Ast.hpp"
-#include "AstVisitor.hpp"
+#include "core/Ast.hpp"
+#include "core/AstVisitor.hpp"
 
 class AstPrinter : public AstVisitor {
   public:

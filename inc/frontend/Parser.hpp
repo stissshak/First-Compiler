@@ -6,9 +6,9 @@
 #include <unordered_map>
 #include <vector>
 
-#include "Ast.hpp"
-#include "SourceMap.hpp"
-#include "Token.hpp"
+#include "core/Ast.hpp"
+#include "core/SourceMap.hpp"
+#include "core/Token.hpp"
 
 class Parser {
   public:

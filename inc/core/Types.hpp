@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "Ast.hpp"
+#include "core/Ast.hpp"
 
 enum class castResult { Equal, Implicit, Warn, No };
 

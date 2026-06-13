@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "Token.hpp"
+#include "core/Token.hpp"
 
 #include <string>
 #include <unordered_map>

@@ -6,12 +6,12 @@
 #include <string>
 #include <vector>
 
-#include "AstAnalyser.hpp"
-#include "AstPrinter.hpp"
-#include "CodeGenerator.hpp"
-#include "Lexer.hpp"
-#include "Parser.hpp"
-#include "Preprocessor.hpp"
+#include "backend/CodeGenerator.hpp"
+#include "frontend/Lexer.hpp"
+#include "frontend/Parser.hpp"
+#include "frontend/Preprocessor.hpp"
+#include "sema/AstAnalyser.hpp"
+#include "support/AstPrinter.hpp"
 
 namespace fs = std::filesystem;
 

@@ -11,8 +11,10 @@ generators or backend libraries.
 
 ## Pipeline
 
-Source flows through the stages below; each is a separate module under `inc/`
-and `src/`:
+Source flows through the stages below. The code is grouped by compiler phase
+under `inc/` and `src/`: `core/` (AST, tokens, types, source map), `frontend/`
+(preprocessor, lexer, parser), `sema/` (analyser), `backend/` (code generator),
+and `support/` (logger, AST printer); `src/comp.cpp` is the driver.
 
 ```
 .mpl ──▶ Preprocessor ──▶ Lexer ──▶ Parser ──▶ Analyser ──▶ CodeGenerator ──▶ .asm
